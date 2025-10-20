@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/workspace/sandbox-sync/target/release/sandbox-sync --scripts /test-scripts --data /test-data --gitkeep sync)",
+      "Bash(/workspace/sandbox-sync/target/release/sandbox-sync --scripts /test-scripts --data /test-data --dry-run sync)",
+      "Read(//test-data/**)",
+      "Bash(rustup target list)",
+      "Bash(cargo build --release --target x86_64-pc-windows-gnu)",
+      "Bash(cargo build --release --target x86_64-apple-darwin)",
+      "Bash(tree -L 2 /workspace/dist/)",
+      "Bash(rustc --print target-list)",
+      "Bash(sudo apt-get update)",
+      "Bash(sudo apt-get install -y clang lld)",
+      "Bash(cargo install cargo-zigbuild)",
+      "Bash(zig version)",
+      "Bash(tar -xf zig-linux-x86_64-0.11.0.tar.xz)",
+      "Bash(sudo mv zig-linux-x86_64-0.11.0 /usr/local/zig)",
+      "Bash(sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig)",
+      "Bash(/usr/local/bin/zig version)",
+      "Bash(sudo mkdir -p /usr/local/zig)",
+      "Bash(sudo cp -r zig-linux-x86_64-0.11.0/* /usr/local/zig/)",
+      "Bash(sudo chmod +x /usr/local/zig/zig)",
+      "Bash(PATH=\"/usr/local/bin:$PATH\" zig version)",
+      "Bash(./zig-linux-x86_64-0.11.0/zig version)",
+      "Bash(wget -q https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git init)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git config user.name \"Shane Kelly\")",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git config user.email \"shane.kelly@pnnl.gov\")",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git add .gitignore LICENSE CHANGELOG.md CONTRIBUTING.md README.md CLAUDE.md)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git add Dockerfile docker-compose.yml .env.example)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git add sandbox-sync/ sandbox-switcher/ examples/ docs/)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git status --short)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

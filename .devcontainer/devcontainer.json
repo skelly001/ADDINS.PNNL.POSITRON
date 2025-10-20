@@ -1,0 +1,76 @@
+{
+  "name": "Sandbox-Sync Development",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "sandbox-dev",
+  "workspaceFolder": "/workspace",
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally
+  "forwardPorts": [3000, 9229],
+
+  // Configure tool-specific properties
+  "customizations": {
+    "vscode": {
+      // Extensions to install in the container
+      "extensions": [
+        // Rust
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "fill-labs.dependi",
+
+        // TypeScript/JavaScript
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+
+        // R
+        "REditorSupport.r",
+
+        // General
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker",
+        "tamasfe.even-better-toml",
+        "ms-vscode.test-adapter-converter",
+
+        // Claude Code extension (correct ID)
+        "Anthropic.claude-code"
+      ],
+
+      // Settings for the container environment
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "editor.formatOnSave": true,
+        "[rust]": {
+          // Use rust-analyzer for formatting via its own config; defaultFormatter removed (unsupported list)
+          "editor.formatOnSave": true
+        },
+        "[typescript]": {
+          // Rely on built-in TS/JS formatter + Prettier extension; removing unsupported defaultFormatter value
+          "editor.formatOnSave": true
+        },
+        "[json]": {
+          // Allow built-in JSON formatter
+          "editor.formatOnSave": true
+        }
+      }
+    }
+  },
+
+  // Run commands after the container is created
+  "postCreateCommand": "bash -c 'echo \"Container ready! Run ./scripts/dev-setup.sh to initialize the project.\"'",
+
+  // Comment out to run as root instead
+  "remoteUser": "developer",
+
+  // Environment variables
+  "containerEnv": {
+    "SCRIPT_PATH": "/test-scripts",
+    "DATA_PATH": "/test-data"
+  },
+
+  // Features to add to the container
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  }
+}

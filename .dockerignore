@@ -1,0 +1,130 @@
+# Docker ignore file for sandbox-sync development container
+# Excludes files that shouldn't be copied into the Docker build context
+
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+.docker
+
+# Rust build artifacts
+**/target/
+**/*.rs.bk
+**/Cargo.lock
+# Keep Cargo.toml for dependency resolution
+
+# Node.js
+**/node_modules/
+**/npm-debug.log
+**/yarn-error.log
+**/package-lock.json
+**/yarn.lock
+**/.npm
+**/.eslintcache
+
+# R
+**/.Rhistory
+**/.RData
+**/.Rproj.user
+**/*.Rproj
+**/.Renviron
+
+# IDE and editor files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*~
+**/.DS_Store
+**/*.code-workspace
+**/.vs/
+**/*.suo
+**/*.user
+
+# OS-specific
+Thumbs.db
+Desktop.ini
+**/.DS_Store
+**/.AppleDouble
+**/.LSOverride
+**/.Spotlight-V100
+**/.Trashes
+
+# OneDrive
+**/.OneDrive*
+**/~$*
+
+# Test and coverage
+**/coverage/
+**/.nyc_output/
+**/test-results/
+**/__pycache__/
+**/*.pyc
+
+# Logs
+**/*.log
+**/logs/
+**/.log
+
+# Temporary files
+**/tmp/
+**/temp/
+**/.temp/
+**/.tmp/
+
+# Build outputs
+**/dist/
+**/build/
+**/out/
+**/*.vsix
+
+# Documentation (keep essential docs like CLAUDE.md)
+# Exclude everything in docs/ except what we explicitly need
+**/docs/**/*.pdf
+**/docs/**/*.docx
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Cache directories
+**/.cache/
+**/.parcel-cache/
+**/.next/
+**/.nuxt/
+
+# Jupyter
+**/.ipynb_checkpoints/
+
+# Backup files
+**/*.bak
+**/*.backup
+**/*.old
+
+# Archives
+**/*.zip
+**/*.tar
+**/*.tar.gz
+**/*.rar
+**/*.7z
+
+# Large binary files
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+**/*.bin
+**/*.img
+**/*.iso
+
+# Test data (exclude large test datasets)
+# Keep small test fixtures
+**/test-data-large/
+**/fixtures-large/
