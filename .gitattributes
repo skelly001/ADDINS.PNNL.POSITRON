@@ -1,0 +1,41 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Rust
+*.rs text eol=lf
+*.toml text eol=lf
+
+# TypeScript/JavaScript
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+
+# R
+*.R text eol=lf
+*.Rprofile text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Binaries
+*.exe binary
+*.vsix binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# Archives
+*.zip binary
+*.tar.gz binary
+*.tgz binary
