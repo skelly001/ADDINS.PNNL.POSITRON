@@ -1,0 +1,84 @@
+version: '3.9'
+
+services:
+  sandbox-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Match host user UID/GID for seamless file permissions
+        # On Windows with WSL2, use default values
+        # On Linux/macOS, override with: USER_UID=$(id -u) USER_GID=$(id -g) docker-compose up
+        USERNAME: developer
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: sandbox-sync-dev:latest
+    container_name: sandbox-sync-dev
+
+    # Interactive terminal for development
+    stdin_open: true
+    tty: true
+
+    # Load variables from .env so SCRIPT_PATH/DATA_PATH are available for interpolation
+    env_file:
+      - .env
+
+    # Volume mounts (removed :cached which is macOS-only and can confuse Windows/Linux)
+    volumes:
+      # Mount entire project directory
+      - .:/workspace
+
+      # Quote entire host:container mapping for paths with spaces
+      - "${SCRIPT_PATH:-./test-scripts}:/test-scripts"
+      - "${DATA_PATH:-./test-data}:/test-data"
+
+      # Persistent caches to speed up rebuilds
+      - cargo-cache:/home/developer/.cargo/registry
+      - cargo-git:/home/developer/.cargo/git
+      - npm-cache:/home/developer/.npm
+      # Use ${HOME} for portability instead of shell-unsupported '~' in compose
+      - ${HOME}/.gitconfig:/home/developer/.gitconfig:ro
+
+    # Environment variables (use .env values; do not overwrite SCRIPT_PATH/DATA_PATH)
+    environment:
+      - RUST_BACKTRACE=1
+      - CARGO_HOME=/home/developer/.cargo
+      - RUSTUP_HOME=/usr/local/rustup
+      - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - SCRIPT_PATH=${SCRIPT_PATH:-/test-scripts}
+      - DATA_PATH=${DATA_PATH:-/test-data}
+
+    # Working directory
+    working_dir: /workspace
+
+    # Rely on default network; custom network not required for single service
+    # restart policy for resilience during dev
+    restart: unless-stopped
+
+    # Port mappings for potential web UI or debugging
+    ports:
+      - "3000:3000"  # Web UI (if needed)
+      - "9229:9229"  # Node.js debugging
+
+    # Command override (default is /bin/bash from Dockerfile)
+    # Uncomment to run specific commands on startup
+    # command: /bin/bash -c "cargo build && npm install && bash"
+
+# Named volumes for persistent caches
+volumes:
+  cargo-cache:
+    name: sandbox-sync-cargo-cache
+  cargo-git:
+    name: sandbox-sync-cargo-git
+  npm-cache:
+    name: sandbox-sync-npm-cache
+
+# Optional: additional services for future expansion
+# services:
+#   # Example: Redis for caching
+#   redis:
+#     image: redis:7-alpine
+#     container_name: sandbox-sync-redis
+#     ports:
+#       - "6379:6379"

@@ -1,0 +1,92 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Node / TypeScript
+node_modules/
+out/
+*.vsix
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Build artifacts (binaries, not source directory)
+/sandbox-sync/target/
+sandbox-sync.exe
+sandbox-sync-windows-*
+sandbox-sync-linux-*
+sandbox-sync-macos-*
+
+# Test directories (examples, not actual test data)
+/test-scripts/*
+/test-data/*
+!test-scripts/.gitkeep
+!test-data/.gitkeep
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# Distribution (generated)
+/dist/binaries/*
+/dist/extension/*
+/dist/*.txt
+!dist/examples/
+!dist/.gitkeep
+
+# Windows path artifacts
+C:\\*
+*\\kell343\\*
+
+# Claude Code
+.claude/
+
+# Dev container
+.devcontainer/
+
+# Documentation (keep only essential)
+/DISTRIBUTION_GUIDE.md
+/DOCKER_SETUP_COMPLETE.md
+/HOW_TO_START.md
+/IMPLEMENTATION_SUMMARY.md
+/CLAUDE_CODE_USAGE.md
