@@ -1,11 +1,11 @@
 
-sandbox-switcher/node_modules
+# Build artifacts
+sandbox-sync/target/
+sandbox-switcher/node_modules/
 
-sandbox-sync/target/x86_64-apple-darwin
-sandbox-sync/target/x86_64-pc-windows-gnu
-sandbox-sync/target/debug
-
-
+# Editor files
+*.swp
+.*.swp
 
 # Temporary files
 *.tmp

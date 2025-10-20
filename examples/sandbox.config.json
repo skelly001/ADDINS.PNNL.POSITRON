@@ -1,0 +1,11 @@
+{
+  "scriptsPath": "/test-scripts",
+  "dataPath": "/test-data",
+  "binaryPath": "",
+  "gitkeep": true,
+  "excludes": [
+    ".git",
+    ".Rproj.user",
+    "node_modules"
+  ]
+}

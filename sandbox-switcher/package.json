@@ -1,0 +1,119 @@
+{
+  "name": "sandbox-switcher",
+  "displayName": "Sandbox Switcher",
+  "description": "Quickly switch between R script and data sandboxes in Positron",
+  "version": "0.1.0",
+  "publisher": "pnnl",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sandbox.toggleRoot",
+        "title": "Sandbox: Toggle Between Scripts and Data"
+      },
+      {
+        "command": "sandbox.focusScripts",
+        "title": "Sandbox: Focus Scripts"
+      },
+      {
+        "command": "sandbox.focusData",
+        "title": "Sandbox: Focus Data"
+      },
+      {
+        "command": "sandbox.openBoth",
+        "title": "Sandbox: Open Both (Multi-root)"
+      },
+      {
+        "command": "sandbox.syncNow",
+        "title": "Sandbox: Sync Now"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "sandbox.toggleRoot",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t"
+      },
+      {
+        "command": "sandbox.focusScripts",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s"
+      },
+      {
+        "command": "sandbox.focusData",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d"
+      },
+      {
+        "command": "sandbox.syncNow",
+        "key": "ctrl+shift+y",
+        "mac": "cmd+shift+y"
+      }
+    ],
+    "configuration": {
+      "title": "Sandbox Switcher",
+      "properties": {
+        "sandbox.scriptsPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the scripts sandbox (Git-tracked)"
+        },
+        "sandbox.dataPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the data sandbox (OneDrive)"
+        },
+        "sandbox.syncBinaryPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to sandbox-sync binary (optional, uses PATH if empty)"
+        },
+        "sandbox.gitkeep": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create .gitkeep files in empty directories"
+        },
+        "sandbox.excludes": {
+          "type": "array",
+          "default": [],
+          "description": "Additional glob patterns to exclude from sync"
+        },
+        "sandbox.autoSyncOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run sync when extension activates"
+        },
+        "sandbox.watchDuringSession": {
+          "type": "boolean",
+          "default": false,
+          "description": "Watch for directory changes during session"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}
