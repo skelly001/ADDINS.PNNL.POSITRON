@@ -17,88 +17,26 @@
   "contributes": {
     "commands": [
       {
-        "command": "sandbox.toggleRoot",
-        "title": "Sandbox: Toggle Between Scripts and Data"
+        "command": "sandbox.switchWdOpposite",
+        "title": "Sandbox: Switch Working Directory to Opposite Sandbox"
       },
       {
-        "command": "sandbox.focusScripts",
-        "title": "Sandbox: Focus Scripts"
-      },
-      {
-        "command": "sandbox.focusData",
-        "title": "Sandbox: Focus Data"
-      },
-      {
-        "command": "sandbox.openBoth",
-        "title": "Sandbox: Open Both (Multi-root)"
+        "command": "sandbox.revealPairedFolder",
+        "title": "Sandbox: Reveal Paired Folder"
       },
       {
         "command": "sandbox.syncNow",
-        "title": "Sandbox: Sync Now"
+        "title": "Sandbox: Sync Directories Now"
       }
     ],
     "keybindings": [
       {
-        "command": "sandbox.toggleRoot",
-        "key": "ctrl+shift+t",
-        "mac": "cmd+shift+t"
-      },
-      {
-        "command": "sandbox.focusScripts",
-        "key": "ctrl+shift+s",
-        "mac": "cmd+shift+s"
-      },
-      {
-        "command": "sandbox.focusData",
-        "key": "ctrl+shift+d",
-        "mac": "cmd+shift+d"
-      },
-      {
-        "command": "sandbox.syncNow",
-        "key": "ctrl+shift+y",
-        "mac": "cmd+shift+y"
+        "command": "sandbox.switchWdOpposite",
+        "key": "ctrl+alt+w",
+        "mac": "cmd+alt+w",
+        "linux": "ctrl+alt+w"
       }
-    ],
-    "configuration": {
-      "title": "Sandbox Switcher",
-      "properties": {
-        "sandbox.scriptsPath": {
-          "type": "string",
-          "default": "",
-          "description": "Absolute path to the scripts sandbox (Git-tracked)"
-        },
-        "sandbox.dataPath": {
-          "type": "string",
-          "default": "",
-          "description": "Absolute path to the data sandbox (OneDrive)"
-        },
-        "sandbox.syncBinaryPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to sandbox-sync binary (optional, uses PATH if empty)"
-        },
-        "sandbox.gitkeep": {
-          "type": "boolean",
-          "default": true,
-          "description": "Create .gitkeep files in empty directories"
-        },
-        "sandbox.excludes": {
-          "type": "array",
-          "default": [],
-          "description": "Additional glob patterns to exclude from sync"
-        },
-        "sandbox.autoSyncOnStartup": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically run sync when extension activates"
-        },
-        "sandbox.watchDuringSession": {
-          "type": "boolean",
-          "default": false,
-          "description": "Watch for directory changes during session"
-        }
-      }
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

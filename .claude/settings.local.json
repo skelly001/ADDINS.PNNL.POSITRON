@@ -29,7 +29,16 @@
       "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git add .gitignore LICENSE CHANGELOG.md CONTRIBUTING.md README.md CLAUDE.md)",
       "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git add Dockerfile docker-compose.yml .env.example)",
       "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git add sandbox-sync/ sandbox-switcher/ examples/ docs/)",
-      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git status --short)"
+      "Bash(GIT_CONFIG_NOSYSTEM=1 HOME=/tmp git status --short)",
+      "Bash(cat:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(/workspace/sandbox-sync/target/release/sandbox-sync:*)",
+      "Read(//test-scripts/**)",
+      "Bash(npm run compile:*)",
+      "Bash(npm run package:*)",
+      "Bash(R --quiet --no-save -e \"source(''.Rprofile'')\")",
+      "Bash(/workspace/dist/bin/linux-x64/sandbox-sync sync-full:*)"
     ],
     "deny": [],
     "ask": []

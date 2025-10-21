@@ -25,6 +25,10 @@ tempfile = "3.8"
 assert_cmd = "2.0"
 predicates = "3.0"
 
+[lib]
+name = "sandbox_sync"
+path = "src/lib.rs"
+
 [[bin]]
 name = "sandbox-sync"
 path = "src/main.rs"
