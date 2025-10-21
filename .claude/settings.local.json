@@ -38,7 +38,10 @@
       "Bash(npm run compile:*)",
       "Bash(npm run package:*)",
       "Bash(R --quiet --no-save -e \"source(''.Rprofile'')\")",
-      "Bash(/workspace/dist/bin/linux-x64/sandbox-sync sync-full:*)"
+      "Bash(/workspace/dist/bin/linux-x64/sandbox-sync sync-full:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(rustup target add:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
