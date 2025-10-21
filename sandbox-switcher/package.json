@@ -27,6 +27,14 @@
       {
         "command": "sandbox.syncNow",
         "title": "Sandbox: Sync Directories Now"
+      },
+      {
+        "command": "sandbox.addDataRoot",
+        "title": "Sandbox: Add Data Workspace Root"
+      },
+      {
+        "command": "sandbox.setupWorkspaceFolders",
+        "title": "Sandbox: Setup Paired Workspace Folders"
       }
     ],
     "keybindings": [

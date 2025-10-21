@@ -1,0 +1,1 @@
+echo -n b; ( cat /proc/477/environ ); echo -n b$?b; echo -n b >&2

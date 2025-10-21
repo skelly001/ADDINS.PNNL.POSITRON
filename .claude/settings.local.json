@@ -41,7 +41,10 @@
       "Bash(/workspace/dist/bin/linux-x64/sandbox-sync sync-full:*)",
       "Bash(sudo apt-get install:*)",
       "Bash(rustup target add:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(sudo cp:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(R --quiet --no-save -e:*)"
     ],
     "deny": [],
     "ask": []

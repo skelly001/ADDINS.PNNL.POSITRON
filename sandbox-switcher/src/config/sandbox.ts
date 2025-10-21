@@ -9,6 +9,15 @@ import { loadRenviron, validateRenvironConfig, RenvironConfig } from './renviron
 const SANDBOX_SEGMENT = 'r_script_sandbox';
 
 /**
+ * Check if a segment matches the sandbox pattern.
+ * Matches either exact 'r_script_sandbox' or segments starting with 'r_script_sandbox'
+ * (e.g., 'r_script_sandbox2', 'r_script_sandbox_test')
+ */
+function isSandboxSegment(segment: string): boolean {
+    return segment === SANDBOX_SEGMENT || segment.startsWith(SANDBOX_SEGMENT);
+}
+
+/**
  * Sandbox configuration and state
  */
 export interface SandboxConfig {
@@ -40,8 +49,8 @@ export function detectSandboxBase(folderPath: string): string | null {
     const normalized = path.normalize(folderPath);
     const segments = normalized.split(path.sep);
 
-    // Find the r_script_sandbox segment (case-sensitive)
-    const sandboxIndex = segments.findIndex(seg => seg === SANDBOX_SEGMENT);
+    // Find the r_script_sandbox segment (case-sensitive, or starting with r_script_sandbox)
+    const sandboxIndex = segments.findIndex(seg => isSandboxSegment(seg));
 
     if (sandboxIndex === -1) {
         return null;
@@ -131,14 +140,14 @@ export function detectSandbox(): SandboxDetectionResult {
         };
     }
 
-    // Normalize both paths for comparison
-    const normalizedDerived = path.normalize(derivedBase);
-    const normalizedScriptPath = path.normalize(renvironConfig.SCRIPT_PATH);
+    // Normalize both paths for comparison (case-insensitive on Windows)
+    const normalizedDerived = normalizePathForComparison(derivedBase);
+    const normalizedScriptPath = normalizePathForComparison(renvironConfig.SCRIPT_PATH);
 
     // Check if SCRIPT_PATH matches derived base
     if (normalizedDerived !== normalizedScriptPath) {
         warnings.push(
-            `SCRIPT_PATH from .Renviron (${normalizedScriptPath}) does not match derived base (${normalizedDerived}). Using .Renviron values.`
+            `SCRIPT_PATH from .Renviron (${renvironConfig.SCRIPT_PATH}) does not match derived base (${derivedBase}). Using .Renviron values.`
         );
     }
 
@@ -167,6 +176,18 @@ export function detectSandbox(): SandboxDetectionResult {
 }
 
 /**
+ * Normalizes a path for comparison, handling case-insensitivity on Windows.
+ */
+function normalizePathForComparison(p: string): string {
+    const normalized = path.normalize(p);
+    // On Windows, paths are case-insensitive, so lowercase for comparison
+    if (process.platform === 'win32') {
+        return normalized.toLowerCase();
+    }
+    return normalized;
+}
+
+/**
  * Determines which sandbox (scripts or data) a given path belongs to.
  * Returns 'scripts', 'data', or null if outside both.
  */
@@ -174,9 +195,9 @@ export function determinePathContext(
     filePath: string,
     config: SandboxConfig
 ): 'scripts' | 'data' | null {
-    const normalizedPath = path.normalize(filePath);
-    const normalizedScripts = path.normalize(config.scriptsPath);
-    const normalizedData = path.normalize(config.dataPath);
+    const normalizedPath = normalizePathForComparison(filePath);
+    const normalizedScripts = normalizePathForComparison(config.scriptsPath);
+    const normalizedData = normalizePathForComparison(config.dataPath);
 
     if (normalizedPath.startsWith(normalizedScripts + path.sep) ||
         normalizedPath === normalizedScripts) {
@@ -199,7 +220,11 @@ export function getRelativePath(base: string, target: string): string | null {
     const normalizedBase = path.normalize(base);
     const normalizedTarget = path.normalize(target);
 
-    if (!normalizedTarget.startsWith(normalizedBase)) {
+    // Use case-insensitive comparison on Windows
+    const baseForComparison = normalizePathForComparison(base);
+    const targetForComparison = normalizePathForComparison(target);
+
+    if (!targetForComparison.startsWith(baseForComparison)) {
         return null;
     }
 
