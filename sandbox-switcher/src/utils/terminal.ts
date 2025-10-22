@@ -11,10 +11,38 @@ import * as path from 'path';
  */
 export function findRTerminals(): vscode.Terminal[] {
     const terminals = vscode.window.terminals;
-    return terminals.filter((t) => {
-        const name = t.name.toLowerCase();
-        return name.includes('r') || name.includes('positron');
+
+    // Log all available terminals for debugging
+    console.log('[findRTerminals] Available terminals:');
+    terminals.forEach((t, idx) => {
+        console.log(`  [${idx}] Name: "${t.name}"`);
     });
+
+    const rTerminals = terminals.filter((t) => {
+        const name = t.name.toLowerCase();
+
+        // Skip known non-R terminals
+        if (name.includes('powershell') || name.includes('cmd') || name.includes('bash') || name === 'pwsh') {
+            console.log(`  Terminal "${t.name}": SKIPPED (known non-R terminal)`);
+            return false;
+        }
+
+        // Match R console patterns
+        const isRConsole =
+            name === 'r' ||
+            name.startsWith('r ') ||
+            name.includes('r console') ||
+            name.includes('r 4.') ||
+            name.includes('console') ||
+            !!name.match(/^r\s*\d+\.\d+/) ||
+            !!name.match(/r-\d+/);
+
+        console.log(`  Terminal "${t.name}": isRConsole=${isRConsole}`);
+        return isRConsole;
+    });
+
+    console.log(`[findRTerminals] Found ${rTerminals.length} R terminals`);
+    return rTerminals;
 }
 
 /**
@@ -47,18 +75,30 @@ export async function getActiveRTerminal(): Promise<vscode.Terminal | null> {
 }
 
 /**
- * Sends setwd() command to R terminal.
+ * Sends setwd() command to R console using Positron's executeCode.console command.
  * Uses forward slashes even on Windows per CLAUDE.md spec.
  */
-export async function sendSetwd(terminal: vscode.Terminal, dirPath: string): Promise<void> {
+export async function sendSetwd(dirPath: string): Promise<void> {
     // Convert to forward slashes (R prefers this even on Windows)
     const forwardSlashPath = dirPath.split(path.sep).join('/');
 
     // Quote the path to handle spaces
     const command = `setwd("${forwardSlashPath}")`;
 
-    terminal.show();
-    terminal.sendText(command);
+    console.log(`[sendSetwd] Original path: ${dirPath}`);
+    console.log(`[sendSetwd] Forward slash path: ${forwardSlashPath}`);
+    console.log(`[sendSetwd] Command to send: ${command}`);
+
+    try {
+        await vscode.commands.executeCommand('workbench.action.executeCode.console', {
+            code: command,
+            languageId: 'r'
+        });
+        console.log(`[sendSetwd] Command executed successfully`);
+    } catch (error) {
+        console.error(`[sendSetwd] Failed to execute command:`, error);
+        throw error;
+    }
 }
 
 /**

@@ -66,28 +66,11 @@ export function activate(context: vscode.ExtensionContext) {
     // Register commands
     registerCommands(context);
 
-    // Automatically setup workspace folders for any folder in r_script_sandbox (including root)
-    const currentFolders = vscode.workspace.workspaceFolders || [];
-
-    // Check if any current folder is within SCRIPT_PATH (including the base itself)
-    for (const folder of currentFolders) {
-        const normalized = path.normalize(folder.uri.fsPath);
-        const scriptsNormalized = path.normalize(sandboxConfig.scriptsPath);
-        const normalizedLower = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-        const scriptsNormalizedLower = process.platform === 'win32' ? scriptsNormalized.toLowerCase() : scriptsNormalized;
-
-        // Check if this folder is within or is SCRIPT_PATH
-        const isWithinScripts = normalizedLower === scriptsNormalizedLower ||
-                                normalizedLower.startsWith(scriptsNormalizedLower + path.sep);
-
-        if (isWithinScripts) {
-            ui.log('Detected folder within r_script_sandbox, automatically setting up paired workspace folders');
-            addWorkspaceRoots(sandboxConfig);
-            break;
-        }
-    }
-
     ui.log('Sandbox Switcher activated successfully');
+
+    // Do NOT modify workspace folders during activation as it causes Positron to cancel R runtime startup
+    // Instead, use the manual command "Sandbox: Setup Paired Workspace Folders"
+    ui.log('Use "Sandbox: Setup Paired Workspace Folders" command to add paired workspace roots');
 }
 
 function registerCommands(context: vscode.ExtensionContext) {

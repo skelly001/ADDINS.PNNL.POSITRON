@@ -38,7 +38,6 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const sandbox_1 = require("../config/sandbox");
 const cli_1 = require("../utils/cli");
-const terminal_1 = require("../utils/terminal");
 /**
  * Determines the current context path for the switchWdOpposite command.
  * Priority order per CLAUDE.md:
@@ -127,15 +126,16 @@ async function switchWdOpposite(config, binaryPath, state, ui) {
         ui.log('switchWdOpposite: DATA_PATH unavailable, aborting switch');
         return;
     }
-    // Get R terminal
-    const terminal = await (0, terminal_1.getActiveRTerminal)();
-    if (!terminal) {
-        ui.showError('No R terminal found');
-        return;
-    }
-    // Send setwd command
+    // Send setwd command to R console using Positron's executeCode.console
     try {
-        await (0, terminal_1.sendSetwd)(terminal, pairedPath);
+        // Convert to forward slashes (R prefers this even on Windows)
+        const forwardSlashPath = pairedPath.split(path.sep).join('/');
+        const command = `setwd("${forwardSlashPath}")`;
+        ui.log(`Executing command: ${command}`);
+        await vscode.commands.executeCommand('workbench.action.executeCode.console', {
+            code: command,
+            languageId: 'r'
+        });
         ui.showSuccess(`Switched to ${context === 'scripts' ? 'data' : 'scripts'} sandbox`);
         ui.log(`setwd sent: ${pairedPath}`);
     }

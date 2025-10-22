@@ -116,16 +116,19 @@ export async function switchWdOpposite(
         return;
     }
 
-    // Get R terminal
-    const terminal = await getActiveRTerminal();
-    if (!terminal) {
-        ui.showError('No R terminal found');
-        return;
-    }
-
-    // Send setwd command
+    // Send setwd command to R console using Positron's executeCode.console
     try {
-        await sendSetwd(terminal, pairedPath);
+        // Convert to forward slashes (R prefers this even on Windows)
+        const forwardSlashPath = pairedPath.split(path.sep).join('/');
+        const command = `setwd("${forwardSlashPath}")`;
+
+        ui.log(`Executing command: ${command}`);
+
+        await vscode.commands.executeCommand('workbench.action.executeCode.console', {
+            code: command,
+            languageId: 'r'
+        });
+
         ui.showSuccess(`Switched to ${context === 'scripts' ? 'data' : 'scripts'} sandbox`);
         ui.log(`setwd sent: ${pairedPath}`);
     } catch (e) {
