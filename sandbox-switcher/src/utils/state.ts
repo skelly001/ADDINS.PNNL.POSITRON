@@ -5,12 +5,27 @@
 export class SessionState {
     private ensuredPaths: Set<string> = new Set();
     private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+    private lastWorkingDirectory: string | null = null;
 
     /**
      * Checks if a relative path has been ensured in this session
      */
     isPathEnsured(relativePath: string): boolean {
         return this.ensuredPaths.has(relativePath);
+    }
+
+    /**
+     * Gets the last working directory that was set via switchWdOpposite
+     */
+    getLastWorkingDirectory(): string | null {
+        return this.lastWorkingDirectory;
+    }
+
+    /**
+     * Sets the last working directory
+     */
+    setLastWorkingDirectory(dirPath: string): void {
+        this.lastWorkingDirectory = dirPath;
     }
 
     /**

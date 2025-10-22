@@ -4,17 +4,19 @@ import { SandboxConfig, determinePathContext, getPairedPath } from '../config/sa
 import { runEnsurePath } from '../utils/cli';
 import { SessionState } from '../utils/state';
 import { SandboxUI } from '../utils/ui';
-import { getActiveRTerminal, sendSetwd } from '../utils/terminal';
 
 /**
- * Determines the current context path for the switchWdOpposite command.
- * Priority order per CLAUDE.md:
- * 1. Active editor file
- * 2. Focused explorer item
- * 3. Last-used sandbox path (from state)
+ * Gets the current working directory path for switching.
+ * Uses last set working directory from state, or falls back to active editor.
  */
 function getCurrentContextPath(state: SessionState): string | null {
-    // 1. Active editor file
+    // Use the last working directory we set (tracks R's actual working directory)
+    const lastWd = state.getLastWorkingDirectory();
+    if (lastWd) {
+        return lastWd;
+    }
+
+    // Fallback to active editor file on first use
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const filePath = activeEditor.document.uri.fsPath;
@@ -22,12 +24,6 @@ function getCurrentContextPath(state: SessionState): string | null {
         return dirPath;
     }
 
-    // 2. Focused explorer item
-    // Note: VS Code doesn't provide a direct API for this, so we skip for now
-    // In a real implementation, we'd use the explorer view API
-
-    // 3. Last-used sandbox path (would be tracked in state)
-    // For now, return null
     return null;
 }
 
@@ -128,6 +124,9 @@ export async function switchWdOpposite(
             code: command,
             languageId: 'r'
         });
+
+        // Track the new working directory in state so next switch uses it
+        state.setLastWorkingDirectory(pairedPath);
 
         ui.showSuccess(`Switched to ${context === 'scripts' ? 'data' : 'scripts'} sandbox`);
         ui.log(`setwd sent: ${pairedPath}`);

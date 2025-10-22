@@ -9,12 +9,25 @@ class SessionState {
     constructor() {
         this.ensuredPaths = new Set();
         this.debounceTimers = new Map();
+        this.lastWorkingDirectory = null;
     }
     /**
      * Checks if a relative path has been ensured in this session
      */
     isPathEnsured(relativePath) {
         return this.ensuredPaths.has(relativePath);
+    }
+    /**
+     * Gets the last working directory that was set via switchWdOpposite
+     */
+    getLastWorkingDirectory() {
+        return this.lastWorkingDirectory;
+    }
+    /**
+     * Sets the last working directory
+     */
+    setLastWorkingDirectory(dirPath) {
+        this.lastWorkingDirectory = dirPath;
     }
     /**
      * Marks a relative path as ensured
