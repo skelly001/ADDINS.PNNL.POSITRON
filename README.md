@@ -1,14 +1,15 @@
+# To use:
+
+1. install the .vsix from sandbox-switcher/sandbox-switcher-0.1.0.vsix
+2. copy the bundled rust binary to System32:
+   terminal w admin (copy "C:\Users\kell343\.positron\extensions\pnnl.sandbox-switcher-0.1.0\bin\win32-x64\sandbox-sync.exe" C:\Windows\System32\)
+3. add the .Rprofile & .Renviron with correct paths to the script sandbox root
+
 # Development Project - Fresh Start# Sandbox Sync for Positron
-
-
 
 This repository is set up with a Docker development environment ready for building your tool with Claude Code.Fast, cross-platform tool for seamless workflow between Git-tracked R scripts and OneDrive-backed data directories in Positron IDE.
 
-
-
 ## Docker Environment## Overview
-
-
 
 The Docker container is pre-configured with:**Sandbox Sync** solves a common workflow challenge for R developers: working with scripts in Git while keeping data in OneDrive (or other non-Git storage). This toolkit provides:
 
@@ -20,11 +21,7 @@ The Docker container is pre-configured with:**Sandbox Sync** solves a common wor
 
 - Cross-compilation tools for multiple platforms- **R integration**: Automatic sync on R session startup
 
-
-
 ## Getting Started## Key Features
-
-
 
 ### 1. Configure Your Paths- ✅ **Directory-only sync** - Creates missing directories; never touches files
 
@@ -34,7 +31,7 @@ Create or edit `.env` file from the example:- ✅ **R integration** - Automatica
 
 - ✅ **OneDrive-friendly** - No file access that would hydrate large placeholders
 
-```powershell- ✅ **Cross-platform** - Windows, macOS, Linux
+````powershell- ✅ **Cross-platform** - Windows, macOS, Linux
 
 # Copy the example (if not already done)- ✅ **Fast** - Built in Rust for performance
 
@@ -70,7 +67,7 @@ docker-compose build
 
 - `Ctrl+Shift+S` → Switch to Scripts
 
-# Start interactive development environment- `Ctrl+Shift+D` → Switch to Data  
+# Start interactive development environment- `Ctrl+Shift+D` → Switch to Data
 
 docker-compose run --rm sandbox-dev- `Ctrl+Shift+T` → Toggle between them
 
@@ -94,23 +91,21 @@ The container provides a clean development environment with all necessary tools 
 
 ## Available Scripts
 
-```
+````
 
 Located in `scripts/` directory:sandbox-sync/
 
-- `build-all.sh` - Build all project components├── sandbox-sync/          # Rust binary
+- `build-all.sh` - Build all project components├── sandbox-sync/ # Rust binary
 
-- `dev-setup.sh` - Initialize project scaffolding├── sandbox-switcher/      # Positron extension
+- `dev-setup.sh` - Initialize project scaffolding├── sandbox-switcher/ # Positron extension
 
-- `test-all.sh` - Run all tests├── examples/              # Configuration examples
+- `test-all.sh` - Run all tests├── examples/ # Configuration examples
 
-- `test-sync.sh` - Test sync functionality├── docs/                  # User documentation
+- `test-sync.sh` - Test sync functionality├── docs/ # User documentation
 
-└── docker-compose.yml     # Development environment
+└── docker-compose.yml # Development environment
 
 ## Files in This Repository```
-
-
 
 ### Docker Configuration## How It Works
 
@@ -130,8 +125,6 @@ Located in `scripts/` directory:sandbox-sync/
 
 - `scripts/` - Shell scripts for building and testingTraditional workflow = manual navigation + R restart + sync headaches
 
-
-
 ### License### The Solution
 
 - `LICENSE` - MIT License
@@ -140,15 +133,15 @@ Located in `scripts/` directory:sandbox-sync/
 
 ## Next Steps```
 
-r_script_sandbox/          data_sandbox/
+r_script_sandbox/ data_sandbox/
 
-1. **Plan Your Project**: Define what you want to build├── project1/       ←──→   ├── project1/
+1. **Plan Your Project**: Define what you want to build├── project1/ ←──→ ├── project1/
 
-2. **Use Claude Code**: Let Claude help you design and implement├── project2/       ←──→   ├── project2/
+2. **Use Claude Code**: Let Claude help you design and implement├── project2/ ←──→ ├── project2/
 
-3. **Iterate**: Build, test, and refine in the Docker environment└── outputs/        ←──→   └── outputs/
+3. **Iterate**: Build, test, and refine in the Docker environment└── outputs/ ←──→ └── outputs/
 
-```
+````
 
 ## Resources
 
@@ -176,16 +169,16 @@ sandbox-sync --scripts <path> --data <path> check
 
 # Watch for changes
 sandbox-sync --scripts <path> --data <path> watch
-```
+````
 
 ### Extension
 
-| Command | Shortcut | Description |
-|---------|----------|-------------|
+| Command       | Shortcut       | Description       |
+| ------------- | -------------- | ----------------- |
 | Focus Scripts | `Ctrl+Shift+S` | Switch to scripts |
-| Focus Data | `Ctrl+Shift+D` | Switch to data |
-| Toggle | `Ctrl+Shift+T` | Toggle between |
-| Sync Now | `Ctrl+Shift+Y` | Manual sync |
+| Focus Data    | `Ctrl+Shift+D` | Switch to data    |
+| Toggle        | `Ctrl+Shift+T` | Toggle between    |
+| Sync Now      | `Ctrl+Shift+Y` | Manual sync       |
 
 ## Development
 
@@ -221,17 +214,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## Platform Support
 
-| Platform | Binary | Extension | R Integration |
-|----------|--------|-----------|---------------|
-| Windows | ✅ | ✅ | ✅ |
-| Linux | ✅ | ✅ | ✅ |
-| macOS | ⚠️ Build from source | ✅ | ✅ |
+| Platform | Binary               | Extension | R Integration |
+| -------- | -------------------- | --------- | ------------- |
+| Windows  | ✅                   | ✅        | ✅            |
+| Linux    | ✅                   | ✅        | ✅            |
+| macOS    | ⚠️ Build from source | ✅        | ✅            |
 
 ## Troubleshooting
 
 See [docs/POSITRON_SETUP_GUIDE.md](docs/POSITRON_SETUP_GUIDE.md) for comprehensive troubleshooting.
 
 **Common issues:**
+
 - Binary not found → Set full path in settings
 - Paths with spaces → Use forward slashes
 - R not updating → Ensure R console is active
