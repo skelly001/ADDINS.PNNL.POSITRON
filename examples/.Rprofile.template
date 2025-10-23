@@ -9,7 +9,8 @@
   # Get the directory where this .Rprofile is located
   # This should be the SCRIPT_PATH
   script_dir <- getwd()
-
+  # message("Working directory when .Rprofile loaded: ", getwd())
+  
   # Load .Renviron from the same directory
   renviron_path <- file.path(script_dir, ".Renviron")
 
@@ -29,6 +30,14 @@
   if (scripts_path == "" || data_path == "") {
     message("Warning: SCRIPT_PATH or DATA_PATH not defined in .Renviron")
     message("Sandbox sync skipped.")
+    return(invisible(NULL))
+  }
+
+  # Check if SCRIPT_PATH contains "r_script_sandbox" as a whole word
+  # Only run sync if WD is actually in r_script_sandbox
+  if (!grepl("\\br_script_sandbox\\b", script_dir)) {
+    message("Warning: SCRIPT_PATH does not contain 'r_script_sandbox' as whole word")
+    message("Sandbox sync skipped for safety.")
     return(invisible(NULL))
   }
 

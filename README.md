@@ -1,204 +1,155 @@
-# To use:
+# Sandbox Sync for Positron
 
-1. install the .vsix from sandbox-switcher/sandbox-switcher-0.1.0.vsix
-2. copy the bundled rust binary to System32:
-   terminal w admin (copy "C:\Users\kell343\.positron\extensions\pnnl.sandbox-switcher-0.1.0\bin\win32-x64\sandbox-sync.exe" C:\Windows\System32\)
-3. add the .Rprofile & .Renviron with correct paths to the script sandbox root
+> Fast, cross-platform toolkit for seamless workflows between Git-tracked R scripts and OneDrive-backed data directories in Positron IDE.
 
-# Development Project - Fresh Start# Sandbox Sync for Positron
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Platform Support](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
-This repository is set up with a Docker development environment ready for building your tool with Claude Code.Fast, cross-platform tool for seamless workflow between Git-tracked R scripts and OneDrive-backed data directories in Positron IDE.
+## Overview
 
-## Docker Environment## Overview
+**Sandbox Sync** solves a common workflow challenge for R developers: keeping scripts under version control while managing large data files separately. This toolkit provides:
 
-The Docker container is pre-configured with:**Sandbox Sync** solves a common workflow challenge for R developers: working with scripts in Git while keeping data in OneDrive (or other non-Git storage). This toolkit provides:
+-   **sandbox-sync**: Rust CLI binary for bidirectional directory structure mirroring
+-   **sandbox-switcher**: Positron/VS Code extension for instant workspace switching
+-   **R integration**: Automatic synchronization on R session startup
 
-- **Rust** (latest stable with cargo, rustfmt, clippy)
+### Key Features
 
-- **Node.js** (v20.x LTS with npm, TypeScript, VS Code extension tools)- **sandbox-sync**: Rust binary that mirrors directory structures between two sandboxes (scripts ↔ data)
+-   ✅ **Directory-only sync** – Creates missing directories; never touches files
+-   ✅ **Instant switching** – Toggle between Scripts and Data with `Ctrl+Alt+W`
+-   ✅ **R integration** – Automatically updates working directory with `setwd()`
+-   ✅ **OneDrive-friendly** – No file access that would hydrate large placeholders
+-   ✅ **Cross-platform** – Windows, macOS, Linux
+-   ✅ **Fast** – Built in Rust for performance
+-   ✅ **Safe** – Never deletes anything; directory creation is idempotent
 
-- **R** (with essential packages)- **sandbox-switcher**: Positron/VS Code extension for instant workspace switching with keyboard shortcuts
+## Quick Start
 
-- Cross-compilation tools for multiple platforms- **R integration**: Automatic sync on R session startup
+### Prerequisites
 
-## Getting Started## Key Features
+-   [Positron IDE](https://github.com/posit-dev/positron) or VS Code
+-   R installed and configured
+-   Two directories: one for scripts (Git-tracked) and one for data (OneDrive/cloud)
 
-### 1. Configure Your Paths- ✅ **Directory-only sync** - Creates missing directories; never touches files
+### Installation
 
-- ✅ **Instant switching** - Toggle between Scripts and Data with `Ctrl+Shift+S/D`
+1.  **Install the Positron extension**
 
-Create or edit `.env` file from the example:- ✅ **R integration** - Automatically updates working directory with `setwd()`
+    ``` powershell
+    # Install from .vsix file
+    positron --install-extension sandbox-switcher-0.1.0.vsix
+    ```
 
-- ✅ **OneDrive-friendly** - No file access that would hydrate large placeholders
+2.  **Copy the Rust binary to system path** (Windows)
 
-````powershell- ✅ **Cross-platform** - Windows, macOS, Linux
+    ``` powershell
+    # Run as Administrator
+    Copy-Item "C:\Users\<username>\.positron\extensions\pnnl.sandbox-switcher-0.1.0\bin\win32-x64\sandbox-sync.exe" -Destination "C:\Windows\System32\"
+    ```
 
-# Copy the example (if not already done)- ✅ **Fast** - Built in Rust for performance
+3.  **Configure your R environment**
 
-Copy-Item .env.example .env- ✅ **Safe** - Never deletes anything; dry-run mode available
+    Create `.Renviron` in your script sandbox root:
 
+    ``` bash
+    SCRIPT_PATH="C:/path/to/r_script_sandbox"
+    DATA_PATH="C:/path/to/data_sandbox"
+    ```
 
+    Add `.Rprofile` to your script sandbox root (see [examples/](examples/) for template)
 
-# Edit with your preferred editor## Quick Start
+4.  **Restart R and start working!**
 
-notepad .env
+For detailed instructions, see [docs/QUICK_START.md](docs/QUICK_START.md).
 
-```See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed installation instructions.
+## How It Works
 
+### The Problem
 
+R developers typically work with: - **Scripts** in Git (version controlled, small files) - **Data** in OneDrive/cloud (large files, not in Git)
 
-Update the paths to match your environment:### Installation Summary
+Traditional workflow = manual navigation + R restarts + sync headaches
 
-- `SCRIPT_PATH`: Your scripts directory
-
-- `DATA_PATH`: Your data directory1. Download binary from [Releases](https://github.com/yourusername/sandbox-sync/releases)
-
-2. Install Positron extension (`.vsix` file)
-
-### 2. Build and Start Docker Container3. Configure paths in Positron settings
-
-4. Start using keyboard shortcuts!
-
-```powershell
-
-# Build the container (first time)### Keyboard Shortcuts
-
-docker-compose build
-
-- `Ctrl+Shift+S` → Switch to Scripts
-
-# Start interactive development environment- `Ctrl+Shift+D` → Switch to Data
-
-docker-compose run --rm sandbox-dev- `Ctrl+Shift+T` → Toggle between them
-
-```- `Ctrl+Shift+Y` → Sync now
-
-
-
-### 3. Start Building with Claude Code## Documentation
-
-
-
-The container provides a clean development environment with all necessary tools installed. You can now use Claude Code to:- **[Quick Start Guide](docs/QUICK_START.md)** - Get up and running in 5 minutes
-
-- Design your project architecture- **[Setup Guide](docs/POSITRON_SETUP_GUIDE.md)** - Comprehensive installation and configuration
-
-- Generate code for your tool- **[CLAUDE.md](CLAUDE.md)** - Complete specification and architecture
-
-- Build and test iteratively
-
-## Project Structure
-
-## Available Scripts
-
-````
-
-Located in `scripts/` directory:sandbox-sync/
-
-- `build-all.sh` - Build all project components├── sandbox-sync/ # Rust binary
-
-- `dev-setup.sh` - Initialize project scaffolding├── sandbox-switcher/ # Positron extension
-
-- `test-all.sh` - Run all tests├── examples/ # Configuration examples
-
-- `test-sync.sh` - Test sync functionality├── docs/ # User documentation
-
-└── docker-compose.yml # Development environment
-
-## Files in This Repository```
-
-### Docker Configuration## How It Works
-
-- `Dockerfile` - Multi-stage Docker build configuration
-
-- `docker-compose.yml` - Docker Compose service definition### The Problem
-
-- `docker-entrypoint.sh` - Container initialization script
-
-- `.env.example` - Environment variables templateR developers typically have:
-
-- `README.docker.md` - Detailed Docker documentation- **Scripts** in Git (version controlled)
-
-- **Data** in OneDrive/cloud (not in Git)
-
-### Build Scripts
-
-- `scripts/` - Shell scripts for building and testingTraditional workflow = manual navigation + R restart + sync headaches
-
-### License### The Solution
-
-- `LICENSE` - MIT License
+### The Solution
 
 **Bidirectional directory mirroring:**
 
-## Next Steps```
+```         
+r_script_sandbox/          data_sandbox/
+├── project1/      ←──→    ├── project1/
+├── project2/      ←──→    ├── project2/
+└── outputs/       ←──→    └── outputs/
+```
 
-r_script_sandbox/ data_sandbox/
+**Instant workspace switching:** - One keyboard shortcut (`Ctrl+Alt+W`) - Explorer reveals paired folder - `setwd()` updates as needed - No R restart required!
 
-1. **Plan Your Project**: Define what you want to build├── project1/ ←──→ ├── project1/
+## Usage
 
-2. **Use Claude Code**: Let Claude help you design and implement├── project2/ ←──→ ├── project2/
+### Keyboard Shortcuts
 
-3. **Iterate**: Build, test, and refine in the Docker environment└── outputs/ ←──→ └── outputs/
+| Command                | Shortcut     | Description                            |
+|----------------------|------------------|--------------------------------|
+| Switch WD to Opposite  | `Ctrl+Alt+W` | Switch working directory to paired dir |
+| Setup Paired Workspace | —            | Show counterpart folder in explorer    |
+| Sync Directories Now   | —            | Manual full sync                       |
 
-````
+### CLI Commands
 
-## Resources
+``` bash
+# Full bidirectional sync (automatically run on R startup)
+sandbox-sync --scripts-path <path> --data-path <path> sync-full --json
 
-**Instant workspace switching:**
+# Ensure a single relative path exists on both sides
+sandbox-sync --scripts-path <path> --data-path <path> --relative <path> ensure-path --json
+```
 
-- Docker documentation: See `README.docker.md`One keyboard shortcut → Explorer switches + `setwd()` updates (no R restart!)
+See `sandbox-sync --help` for all options.
 
-- Run `docker-compose run --rm sandbox-dev` to enter the development environment
+## Project Structure
 
-- Inside the container, run any command to see the quick start guide## Commands
-
-
-
----### Binary
-
-
-
-**Ready to build something amazing!** 🚀```bash
-
-# Sync directories
-sandbox-sync --scripts <path> --data <path> sync
-
-# Check missing directories
-sandbox-sync --scripts <path> --data <path> check
-
-# Watch for changes
-sandbox-sync --scripts <path> --data <path> watch
-````
-
-### Extension
-
-| Command       | Shortcut       | Description       |
-| ------------- | -------------- | ----------------- |
-| Focus Scripts | `Ctrl+Shift+S` | Switch to scripts |
-| Focus Data    | `Ctrl+Shift+D` | Switch to data    |
-| Toggle        | `Ctrl+Shift+T` | Toggle between    |
-| Sync Now      | `Ctrl+Shift+Y` | Manual sync       |
+```         
+ADDINS.PNNL.VSC/
+├── sandbox-sync/         # Rust CLI binary
+│   ├── src/
+│   │   ├── main.rs
+│   │   └── lib.rs
+│   └── Cargo.toml
+├── sandbox-switcher/     # Positron/VS Code extension
+│   ├── src/
+│   │   └── extension.ts
+│   ├── package.json
+│   └── sandbox-switcher-0.1.0.vsix   
+├── examples/             # Configuration templates
+│   ├── .Renviron.example
+│   └── .Rprofile.example
+├── docs/                 # Documentation
+│   ├── QUICK_START.md
+│   └── POSITRON_SETUP_GUIDE.md
+└── docker-compose.yml    # Development environment
+```
 
 ## Development
 
-### Build from Source
+### Building from Source
 
-```bash
-# Rust binary
+**Rust binary:**
+
+``` bash
 cd sandbox-sync
 cargo build --release
+```
 
-# Positron extension
+**Positron extension:**
+
+``` bash
 cd sandbox-switcher
 npm install
 npm run compile
-npm run package
+npm run package  # Creates .vsix file
 ```
 
-### Docker Development
+### Docker Development Environment
 
-```bash
+``` bash
 cp .env.example .env
 # Edit .env with your paths
 
@@ -210,15 +161,17 @@ cargo build --release
 cargo test
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## Platform Support
 
-| Platform | Binary               | Extension | R Integration |
-| -------- | -------------------- | --------- | ------------- |
-| Windows  | ✅                   | ✅        | ✅            |
-| Linux    | ✅                   | ✅        | ✅            |
-| macOS    | ⚠️ Build from source | ✅        | ✅            |
+| Platform | Binary | Extension | R Integration |
+|----------|--------|-----------|---------------|
+| Windows  | ✅     | ✅        | ✅            |
+| Linux    | ✅     | ✅        | ✅            |
+| macOS    | ✅\*   | ✅        | ✅            |
+
+\* macOS: Build from source required
 
 ## Troubleshooting
 
@@ -226,26 +179,30 @@ See [docs/POSITRON_SETUP_GUIDE.md](docs/POSITRON_SETUP_GUIDE.md) for comprehensi
 
 **Common issues:**
 
-- Binary not found → Set full path in settings
-- Paths with spaces → Use forward slashes
-- R not updating → Ensure R console is active
+-   **Binary not found** → Ensure `sandbox-sync` is in your system PATH or set full path in extension settings
+-   **Paths with spaces** → Use forward slashes and quotes in `.Renviron`
+-   **R not updating** → Ensure an active R terminal is running in Positron
+
+## Documentation
+
+-   [**Quick Start Guide**](docs/QUICK_START.md) – Installation and setup
+-   [**Setup Guide**](docs/POSITRON_SETUP_GUIDE.md) – Comprehensive configuration reference
+-   [**CLAUDE.md**](CLAUDE.md) – Complete specification and architecture
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT License – see [LICENSE](LICENSE) for details.
 
 ## Credits
 
-Built with Rust, clap, notify, jwalk, and VS Code Extension API.
+Built with [Rust](https://www.rust-lang.org/), [clap](https://docs.rs/clap/), [rayon](https://docs.rs/rayon/), [walkdir](https://docs.rs/walkdir/), and the [Positron Extension API](https://positron.posit.co/extension-development.html).
 
 Developed for PNNL R developers.
 
----
+------------------------------------------------------------------------
 
-**Documentation:** [docs/](docs/)  
-**Issues:** [GitHub Issues](https://github.com/yourusername/sandbox-sync/issues)  
-**Releases:** [GitHub Releases](https://github.com/yourusername/sandbox-sync/releases)
+**Documentation:** [docs/](docs/) **Issues:** [GitHub Issues](https://github.com/pnnl/sandbox-sync/issues) **Releases:** [GitHub Releases](https://github.com/pnnl/sandbox-sync/releases)

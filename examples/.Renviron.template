@@ -9,10 +9,3 @@ SCRIPT_PATH="/path/to/r_script_sandbox"
 # This should be the root of your data_sandbox directory
 DATA_PATH="/path/to/data_sandbox"
 
-# Example with quoted paths (useful for paths with spaces):
-# SCRIPT_PATH="/Users/username/My Documents/r_script_sandbox"
-# DATA_PATH="/Users/username/OneDrive - PNNL/Documents/data_sandbox"
-
-# Example for Windows (use forward slashes or escaped backslashes):
-# SCRIPT_PATH="C:/Users/username/dev/r_script_sandbox"
-# DATA_PATH="C:/Users/username/OneDrive - PNNL/Documents/data_sandbox"
