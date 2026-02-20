@@ -46,7 +46,14 @@
     Copy-Item "C:\Users\<username>\.positron\extensions\pnnl.sandbox-switcher-0.1.0\bin\win32-x64\sandbox-sync.exe" -Destination "C:\Windows\System32\"
     ```
 
-3.  **Configure your R environment**
+3.  **Copy the Rust binary to system path** (Mac)
+
+    ``` bash
+    cp sandbox-sync/target/release/mac/sandbox-sync "$HOME/.local/bin/"
+    chmod +x "$HOME/.local/bin/sandbox-sync"
+    ```
+
+4.  **Configure your R environment**
 
     Create `.Renviron` in your script sandbox root:
 
@@ -57,7 +64,7 @@
 
     Add `.Rprofile` to your script sandbox root (see [examples/](examples/) for template)
 
-4.  **Restart R and start working!**
+5.  **Restart R and start working!**
 
 For detailed instructions, see [docs/QUICK_START.md](docs/QUICK_START.md).
 

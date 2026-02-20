@@ -1,6 +1,14 @@
 
-# Build artifacts
-sandbox-sync/target/
+# Build artifacts - ignore target but keep release binaries
+sandbox-sync/target/*
+!sandbox-sync/target/release/
+sandbox-sync/target/release/*
+!sandbox-sync/target/release/linux/
+sandbox-sync/target/release/linux/*
+!sandbox-sync/target/release/linux/sandbox-sync
+!sandbox-sync/target/release/mac/
+sandbox-sync/target/release/mac/*
+!sandbox-sync/target/release/mac/sandbox-sync
 sandbox-switcher/node_modules/
 
 # Editor files

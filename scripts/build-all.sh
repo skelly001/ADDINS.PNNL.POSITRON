@@ -56,6 +56,19 @@ if [ -d "$WORKSPACE_ROOT/sandbox-sync" ]; then
         else
             echo -e "${YELLOW}⚠ Warning: Binary may not be functioning correctly${NC}"
         fi
+
+        # NOTE: cargo outputs the binary to target/release/sandbox-sync, but
+        # the repo tracks platform-specific binaries under:
+        #   target/release/linux/sandbox-sync
+        #   target/release/mac/sandbox-sync
+        # After building, copy the binary into the correct platform folder
+        # before committing. For example, on Linux:
+        #   cp target/release/sandbox-sync target/release/linux/sandbox-sync
+        if [ "$BUILD_MODE" != "debug" ]; then
+            echo -e "${YELLOW}NOTE: Remember to copy the binary to the platform folder before committing:${NC}"
+            echo -e "${YELLOW}  target/release/linux/sandbox-sync  (Linux)${NC}"
+            echo -e "${YELLOW}  target/release/mac/sandbox-sync    (macOS)${NC}"
+        fi
     else
         echo -e "${RED}✗ Binary build failed${NC}"
         exit 1
