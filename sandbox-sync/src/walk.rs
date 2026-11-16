@@ -1,97 +1,63 @@
-use crate::filter::PathFilter;
-use crate::paths;
-use anyhow::{Context, Result};
+use crate::filter::is_excluded_name;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-/// Walks a directory tree and collects all directory paths (excluding files).
-/// Returns a sorted set of relative paths from the base directory.
+/// Directories found under one base, plus any problems met while walking.
+#[derive(Debug, Default)]
+pub struct WalkResult {
+    /// Relative paths of every non-excluded directory under the base.
+    pub dirs: BTreeSet<PathBuf>,
+    /// Relative paths of symlinks met on the way. Nothing is ever created at
+    /// or below one of these, because that would write outside the base.
+    pub links: BTreeSet<PathBuf>,
+    /// Sub-trees that could not be read. They are skipped, not fatal.
+    pub warnings: Vec<String>,
+}
+
+/// Walks a directory tree and collects all directory paths relative to `base`.
 ///
-/// This function:
-/// - Only collects directories, not files
-/// - Skips symlinks to avoid infinite loops
-/// - Applies the provided filter to exclude unwanted directories
-/// - Returns paths relative to the base directory
-pub fn collect_directories<P: AsRef<Path>>(
-    base: P,
-    filter: &PathFilter,
-) -> Result<BTreeSet<PathBuf>> {
-    let base = base.as_ref();
-    let base_normalized = paths::normalize_path(base)
-        .with_context(|| format!("Failed to normalize base path: {}", base.display()))?;
+/// - Only real directories are collected. Files, symlinks and Windows
+///   junctions are skipped and never descended into.
+/// - Excluded directories (see `filter`) are pruned together with their contents.
+/// - A sub-tree that cannot be read becomes a warning; the walk continues.
+///
+/// `base` must already be normalized.
+pub fn collect_directories(base: &Path) -> WalkResult {
+    let mut result = WalkResult::default();
 
-    let mut dirs = BTreeSet::new();
-
-    for entry in WalkDir::new(&base_normalized)
-        .follow_links(false) // Never follow symlinks per spec
+    let walker = WalkDir::new(base)
+        .follow_links(false)
+        .min_depth(1)
         .into_iter()
         .filter_entry(|e| {
-            // Skip if it's a symlink
-            if PathFilter::is_symlink(e.path()) {
-                return false;
-            }
+            (e.file_type().is_dir() || e.path_is_symlink()) && !is_excluded_name(e.file_name())
+        });
 
-            // Skip if the filter says to exclude
-            // Compute relative path for filtering
-            if let Ok(rel) = paths::relative_path(&base_normalized, e.path()) {
-                if filter.should_exclude(&rel) {
-                    return false;
+    for entry in walker {
+        match entry {
+            Ok(entry) => {
+                if let Ok(rel) = entry.path().strip_prefix(base) {
+                    if entry.path_is_symlink() {
+                        result.links.insert(rel.to_path_buf());
+                    } else {
+                        result.dirs.insert(rel.to_path_buf());
+                    }
                 }
             }
-
-            true
-        })
-    {
-        let entry = entry.with_context(|| "Error walking directory")?;
-
-        // Only process directories, skip files
-        if !entry.file_type().is_dir() {
-            continue;
-        }
-
-        let entry_path = entry.path();
-
-        // Skip the base directory itself
-        if entry_path == base_normalized {
-            continue;
-        }
-
-        // Compute relative path
-        match paths::relative_path(&base_normalized, entry_path) {
-            Ok(rel_path) => {
-                // Double-check exclusion (defensive)
-                if !filter.should_exclude(&rel_path) {
-                    dirs.insert(rel_path);
-                }
-            }
-            Err(_) => {
-                // Skip paths we can't compute relative paths for
-                continue;
+            Err(e) => {
+                let location = e
+                    .path()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| base.display().to_string());
+                result
+                    .warnings
+                    .push(format!("Skipped unreadable path {}: {}", location, e));
             }
         }
     }
 
-    Ok(dirs)
-}
-
-/// Collects directories from both scripts and data paths and returns their union.
-/// This is the core operation for sync-full.
-pub fn collect_union<P: AsRef<Path>, Q: AsRef<Path>>(
-    scripts_path: P,
-    data_path: Q,
-    filter: &PathFilter,
-) -> Result<(BTreeSet<PathBuf>, BTreeSet<PathBuf>, BTreeSet<PathBuf>)> {
-    let scripts_dirs = collect_directories(&scripts_path, filter)
-        .with_context(|| format!("Failed to walk scripts path: {}", scripts_path.as_ref().display()))?;
-
-    let data_dirs = collect_directories(&data_path, filter)
-        .with_context(|| format!("Failed to walk data path: {}", data_path.as_ref().display()))?;
-
-    // Compute union
-    let union: BTreeSet<PathBuf> = scripts_dirs.union(&data_dirs).cloned().collect();
-
-    Ok((scripts_dirs, data_dirs, union))
+    result
 }
 
 #[cfg(test)]
@@ -100,150 +66,102 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    fn create_test_tree(base: &Path) -> Result<()> {
-        // Create a test directory structure
-        fs::create_dir_all(base.join("dir1/subdir1"))?;
-        fs::create_dir_all(base.join("dir1/subdir2"))?;
-        fs::create_dir_all(base.join("dir2"))?;
-        fs::create_dir_all(base.join("dir3/nested/deep"))?;
-
-        // Create some files (should be ignored)
-        fs::write(base.join("file.txt"), "content")?;
-        fs::write(base.join("dir1/file.R"), "R script")?;
-
-        // Create directories that should be filtered
-        fs::create_dir_all(base.join(".git/objects"))?;
-        fs::create_dir_all(base.join(".vscode"))?;
-        fs::create_dir_all(base.join("dir1/.hidden"))?;
-
-        Ok(())
-    }
-
     #[test]
     fn test_collect_directories_basic() {
         let temp_dir = TempDir::new().unwrap();
         let base = temp_dir.path();
 
-        create_test_tree(base).unwrap();
+        fs::create_dir_all(base.join("dir1/subdir1")).unwrap();
+        fs::create_dir_all(base.join("dir1/subdir2")).unwrap();
+        fs::create_dir_all(base.join("dir2")).unwrap();
+        fs::create_dir_all(base.join("dir3/nested/deep")).unwrap();
+        fs::write(base.join("file.txt"), "content").unwrap();
+        fs::write(base.join("dir1/file.R"), "R script").unwrap();
+        fs::create_dir_all(base.join(".git/objects")).unwrap();
+        fs::create_dir_all(base.join(".vscode")).unwrap();
+        fs::create_dir_all(base.join("dir1/.hidden")).unwrap();
+        fs::create_dir_all(base.join("dir2/tmp/inner")).unwrap();
 
-        let filter = PathFilter::new().unwrap();
-        let dirs = collect_directories(base, &filter).unwrap();
+        let result = collect_directories(base);
+        let expected: BTreeSet<PathBuf> = [
+            "dir1",
+            "dir1/subdir1",
+            "dir1/subdir2",
+            "dir2",
+            "dir3",
+            "dir3/nested",
+            "dir3/nested/deep",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .collect();
 
-        // Should contain the non-filtered directories
-        assert!(dirs.contains(Path::new("dir1")));
-        assert!(dirs.contains(Path::new("dir1/subdir1")));
-        assert!(dirs.contains(Path::new("dir1/subdir2")));
-        assert!(dirs.contains(Path::new("dir2")));
-        assert!(dirs.contains(Path::new("dir3")));
-        assert!(dirs.contains(Path::new("dir3/nested")));
-        assert!(dirs.contains(Path::new("dir3/nested/deep")));
-
-        // Should NOT contain filtered directories
-        assert!(!dirs.contains(Path::new(".git")));
-        assert!(!dirs.contains(Path::new(".git/objects")));
-        assert!(!dirs.contains(Path::new(".vscode")));
-        assert!(!dirs.contains(Path::new("dir1/.hidden")));
+        assert_eq!(result.dirs, expected);
+        assert!(result.warnings.is_empty());
     }
 
     #[test]
-    fn test_collect_directories_with_spaces() {
+    fn test_collect_directories_spaces_and_unicode() {
         let temp_dir = TempDir::new().unwrap();
         let base = temp_dir.path();
+        let unicode_name = "folder_\u{4E2D}\u{6587}";
 
-        fs::create_dir_all(base.join("dir with spaces")).unwrap();
         fs::create_dir_all(base.join("dir with spaces/nested")).unwrap();
-
-        let filter = PathFilter::new().unwrap();
-        let dirs = collect_directories(base, &filter).unwrap();
-
-        assert!(dirs.contains(Path::new("dir with spaces")));
-        assert!(dirs.contains(Path::new("dir with spaces/nested")));
-    }
-
-    #[test]
-    fn test_collect_directories_with_unicode() {
-        let temp_dir = TempDir::new().unwrap();
-        let base = temp_dir.path();
-
-        let unicode_name = "folder_\u{4E2D}\u{6587}"; // "folder_中文"
         fs::create_dir_all(base.join(unicode_name)).unwrap();
 
-        let filter = PathFilter::new().unwrap();
-        let dirs = collect_directories(base, &filter).unwrap();
-
-        assert!(dirs.contains(Path::new(unicode_name)));
+        let result = collect_directories(base);
+        assert!(result.dirs.contains(Path::new("dir with spaces")));
+        assert!(result.dirs.contains(Path::new("dir with spaces/nested")));
+        assert!(result.dirs.contains(Path::new(unicode_name)));
     }
 
+    #[cfg(unix)]
     #[test]
-    fn test_collect_union() {
-        let temp_dir = TempDir::new().unwrap();
-        let scripts_base = temp_dir.path().join("scripts");
-        let data_base = temp_dir.path().join("data");
+    fn test_symlinks_are_skipped() {
+        use std::os::unix::fs::symlink;
 
-        fs::create_dir_all(&scripts_base).unwrap();
-        fs::create_dir_all(&data_base).unwrap();
-
-        // Create different directory structures
-        fs::create_dir_all(scripts_base.join("scripts_only")).unwrap();
-        fs::create_dir_all(scripts_base.join("shared")).unwrap();
-        fs::create_dir_all(data_base.join("data_only")).unwrap();
-        fs::create_dir_all(data_base.join("shared")).unwrap();
-
-        let filter = PathFilter::new().unwrap();
-        let (scripts_dirs, data_dirs, union) =
-            collect_union(&scripts_base, &data_base, &filter).unwrap();
-
-        // Check scripts_dirs
-        assert!(scripts_dirs.contains(Path::new("scripts_only")));
-        assert!(scripts_dirs.contains(Path::new("shared")));
-        assert!(!scripts_dirs.contains(Path::new("data_only")));
-
-        // Check data_dirs
-        assert!(data_dirs.contains(Path::new("data_only")));
-        assert!(data_dirs.contains(Path::new("shared")));
-        assert!(!data_dirs.contains(Path::new("scripts_only")));
-
-        // Check union
-        assert!(union.contains(Path::new("scripts_only")));
-        assert!(union.contains(Path::new("data_only")));
-        assert!(union.contains(Path::new("shared")));
-        assert_eq!(union.len(), 3);
-    }
-
-    #[test]
-    fn test_symlink_skipping() {
         let temp_dir = TempDir::new().unwrap();
         let base = temp_dir.path();
+        fs::create_dir_all(base.join("regular/inner")).unwrap();
+        symlink(base.join("regular"), base.join("link")).unwrap();
 
-        // Create a regular directory
-        fs::create_dir_all(base.join("regular")).unwrap();
+        let result = collect_directories(base);
+        assert!(result.dirs.contains(Path::new("regular")));
+        assert!(result.dirs.contains(Path::new("regular/inner")));
+        assert!(!result.dirs.contains(Path::new("link")));
+        assert!(!result.dirs.contains(Path::new("link/inner")));
+        assert!(result.links.contains(Path::new("link")));
+        assert_eq!(result.links.len(), 1);
+    }
 
-        // Create a symlink (Unix only)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::symlink;
-            let target = base.join("regular");
-            let link = base.join("link");
-            symlink(&target, &link).unwrap();
+    #[cfg(unix)]
+    #[test]
+    fn test_unreadable_subdir_is_a_warning() {
+        use std::os::unix::fs::PermissionsExt;
 
-            let filter = PathFilter::new().unwrap();
-            let dirs = collect_directories(base, &filter).unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+        let locked = base.join("locked");
+        fs::create_dir_all(locked.join("inner")).unwrap();
+        fs::create_dir_all(base.join("open")).unwrap();
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
 
-            // Should contain regular but not link
-            assert!(dirs.contains(Path::new("regular")));
-            assert!(!dirs.contains(Path::new("link")));
+        let result = collect_directories(base);
+
+        // Restore so the temp dir can be cleaned up.
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(result.dirs.contains(Path::new("open")));
+        assert!(result.dirs.contains(Path::new("locked")));
+        // Root can read anything, in which case there is nothing to warn about.
+        if !result.dirs.contains(Path::new("locked/inner")) {
+            assert_eq!(result.warnings.len(), 1);
         }
     }
 
     #[test]
     fn test_empty_directory() {
         let temp_dir = TempDir::new().unwrap();
-        let base = temp_dir.path();
-
-        let filter = PathFilter::new().unwrap();
-        let dirs = collect_directories(base, &filter).unwrap();
-
-        // Empty directory should return empty set
-        assert!(dirs.is_empty());
+        assert!(collect_directories(temp_dir.path()).dirs.is_empty());
     }
 }

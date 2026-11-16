@@ -1,97 +1,62 @@
 import * as vscode from 'vscode';
 
-/**
- * UI utilities for status messages and logging
- */
+type StatusKind = 'success' | 'warning' | 'error';
+
+const STATUS: Record<StatusKind, { icon: string; durationMs: number }> = {
+    success: { icon: 'check', durationMs: 4000 },
+    warning: { icon: 'warning', durationMs: 5000 },
+    error: { icon: 'error', durationMs: 6000 },
+};
+
+/** Status bar messages, notifications and the "Sandbox Sync" output log. */
 export class SandboxUI {
-    private outputChannel: vscode.OutputChannel;
-    private statusBarItem: vscode.StatusBarItem;
+    private outputChannel = vscode.window.createOutputChannel('Sandbox Sync');
+    private statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    private hideTimer: NodeJS.Timeout | undefined;
 
-    constructor() {
-        this.outputChannel = vscode.window.createOutputChannel('Sandbox Sync');
-        this.statusBarItem = vscode.window.createStatusBarItem(
-            vscode.StatusBarAlignment.Left,
-            100
-        );
-    }
-
-    /**
-     * Logs a message to the output channel
-     */
+    /** Appends a timestamped line to the output channel. */
     log(message: string): void {
-        const timestamp = new Date().toISOString();
-        this.outputChannel.appendLine(`[${timestamp}] ${message}`);
+        this.outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
     }
 
-    /**
-     * Shows the output channel
-     */
     showOutput(): void {
-        this.outputChannel.show();
+        this.outputChannel.show(true);
     }
 
-    /**
-     * Shows a success message in the status bar (temporary)
-     */
-    showSuccess(message: string, durationMs: number = 3000): void {
-        this.statusBarItem.text = `$(check) ${message}`;
+    /** Shows a short message in the status bar for a few seconds, and logs it. */
+    status(kind: StatusKind, message: string): void {
+        const { icon, durationMs } = STATUS[kind];
+        this.log(message);
+
+        if (this.hideTimer) {
+            clearTimeout(this.hideTimer);
+        }
+        this.statusBarItem.text = `$(${icon}) ${message}`;
         this.statusBarItem.show();
-
-        setTimeout(() => {
-            this.statusBarItem.hide();
-        }, durationMs);
+        this.hideTimer = setTimeout(() => this.statusBarItem.hide(), durationMs);
     }
 
-    /**
-     * Shows an error message in the status bar (temporary)
-     */
-    showError(message: string, durationMs: number = 5000): void {
-        this.statusBarItem.text = `$(error) ${message}`;
-        this.statusBarItem.show();
-
-        setTimeout(() => {
-            this.statusBarItem.hide();
-        }, durationMs);
+    /** Shows a non-blocking warning popup, and logs it. */
+    notifyWarning(message: string): void {
+        this.log(message);
+        void vscode.window.showWarningMessage(message);
     }
 
-    /**
-     * Shows a warning message in the status bar (temporary)
-     */
-    showWarning(message: string, durationMs: number = 4000): void {
-        this.statusBarItem.text = `$(warning) ${message}`;
-        this.statusBarItem.show();
-
-        setTimeout(() => {
-            this.statusBarItem.hide();
-        }, durationMs);
+    /** Shows a non-blocking error popup, and logs it. */
+    notifyError(message: string): void {
+        this.log(message);
+        void vscode.window.showErrorMessage(message);
     }
 
-    /**
-     * Shows a non-blocking information message
-     */
-    showInfo(message: string): void {
-        vscode.window.showInformationMessage(message);
-    }
-
-    /**
-     * Shows a non-blocking warning notification
-     */
-    showWarningNotification(message: string): void {
-        vscode.window.showWarningMessage(message);
-    }
-
-    /**
-     * Shows a non-blocking error notification
-     */
-    showErrorNotification(message: string): void {
-        vscode.window.showErrorMessage(message);
-    }
-
-    /**
-     * Disposes UI resources
-     */
     dispose(): void {
+        if (this.hideTimer) {
+            clearTimeout(this.hideTimer);
+        }
         this.outputChannel.dispose();
         this.statusBarItem.dispose();
     }
+}
+
+export function errorMessage(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
 }

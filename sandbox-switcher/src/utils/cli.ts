@@ -1,10 +1,9 @@
 import { spawn } from 'child_process';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
+import { SandboxConfig, isDirectory, sidePath } from '../config/sandbox';
 
-/**
- * Result from sandbox-sync sync-full command
- */
+/** Result from `sandbox-sync sync-full --json` */
 export interface SyncFullResult {
     ok: boolean;
     created_in_scripts: number;
@@ -18,9 +17,7 @@ export interface SyncFullResult {
     errors: string[];
 }
 
-/**
- * Result from sandbox-sync ensure-path command
- */
+/** Result from `sandbox-sync ensure-path --json` */
 export interface EnsurePathResult {
     ok: boolean;
     ensured_relative: string;
@@ -36,167 +33,106 @@ export interface EnsurePathResult {
 }
 
 /**
- * Finds the sandbox-sync binary.
- * Looks in:
- * 1. Bundled bin directory (extension/bin/{platform}/sandbox-sync)
- * 2. PATH
+ * Finds the sandbox-sync binary: the copy bundled with the extension for this
+ * platform and architecture (bin/<platform>-<arch>/), otherwise the bare
+ * name, which is resolved through PATH when run.
  */
-export function findSandboxSyncBinary(extensionPath: string): string | null {
-    // Determine platform-specific binary name and path
-    const platform = process.platform;
-    let binaryName = 'sandbox-sync';
-    let platformDir = '';
+export function findSandboxSyncBinary(extensionPath: string): string {
+    const binaryName = process.platform === 'win32' ? 'sandbox-sync.exe' : 'sandbox-sync';
+    const bundled = path.join(
+        extensionPath,
+        'bin',
+        `${process.platform}-${process.arch}`,
+        binaryName
+    );
 
-    if (platform === 'win32') {
-        binaryName = 'sandbox-sync.exe';
-        platformDir = 'win32-x64';
-    } else if (platform === 'darwin') {
-        platformDir = 'darwin-x64';
-    } else {
-        platformDir = 'linux-x64';
+    if (fs.existsSync(bundled)) {
+        if (process.platform !== 'win32') {
+            // Extension packaging can drop the executable bit.
+            try {
+                fs.chmodSync(bundled, 0o755);
+            } catch {
+                // Not fatal: the file may already be executable.
+            }
+        }
+        return bundled;
     }
 
-    // Check bundled binary
-    const bundledPath = path.join(extensionPath, 'bin', platformDir, binaryName);
-    if (fs.existsSync(bundledPath)) {
-        return bundledPath;
-    }
-
-    // Fallback to PATH
-    return binaryName; // spawn will search PATH
+    return binaryName;
 }
 
-/**
- * Executes sandbox-sync command and returns parsed JSON output
- */
-async function executeSandboxSync(
-    binaryPath: string,
-    args: string[],
-    timeoutMs: number = 60000
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+/** Runs sandbox-sync with `--json` and returns its parsed output. */
+function runJson<T>(binaryPath: string, args: string[], timeoutMs = 60000): Promise<T> {
     return new Promise((resolve, reject) => {
-        const child = spawn(binaryPath, args);
-
+        const child = spawn(binaryPath, [...args, '--json']);
         let stdout = '';
         let stderr = '';
 
-        child.stdout.on('data', (data) => {
-            stdout += data.toString();
-        });
-
-        child.stderr.on('data', (data) => {
-            stderr += data.toString();
-        });
+        child.stdout.on('data', (data) => (stdout += data.toString()));
+        child.stderr.on('data', (data) => (stderr += data.toString()));
 
         const timeout = setTimeout(() => {
             child.kill();
-            reject(new Error(`Command timed out after ${timeoutMs}ms`));
+            reject(new Error(`sandbox-sync timed out after ${timeoutMs}ms`));
         }, timeoutMs);
-
-        child.on('close', (code) => {
-            clearTimeout(timeout);
-            resolve({
-                stdout,
-                stderr,
-                exitCode: code ?? -1,
-            });
-        });
 
         child.on('error', (err) => {
             clearTimeout(timeout);
-            reject(err);
+            const notFound = (err as NodeJS.ErrnoException).code === 'ENOENT';
+            reject(
+                notFound
+                    ? new Error(
+                          `sandbox-sync binary not found (${binaryPath}). ` +
+                              'Install it on PATH or in the extension bin folder.'
+                      )
+                    : err
+            );
+        });
+
+        child.on('close', (code) => {
+            clearTimeout(timeout);
+            try {
+                resolve(JSON.parse(stdout) as T);
+            } catch {
+                reject(
+                    new Error(
+                        `sandbox-sync exited with code ${code} and no JSON output. ` +
+                            `stderr: ${stderr.trim() || '(empty)'}`
+                    )
+                );
+            }
         });
     });
 }
 
-/**
- * Runs sync-full command
- */
-export async function runSyncFull(
-    binaryPath: string,
-    scriptsPath: string,
-    dataPath: string
-): Promise<SyncFullResult> {
-    const args = [
-        'sync-full',
-        '--scripts',
-        scriptsPath,
-        '--data',
-        dataPath,
-        '--json',
-    ];
+function baseArgs(config: SandboxConfig): string[] {
+    return ['--scripts', config.scriptsPath, '--data', config.dataPath];
+}
 
-    const result = await executeSandboxSync(binaryPath, args);
-
-    // Parse JSON output
-    try {
-        const output: SyncFullResult = JSON.parse(result.stdout);
-        return output;
-    } catch (e) {
-        // JSON parsing failed, return error result
-        return {
-            ok: false,
-            created_in_scripts: 0,
-            created_in_data: 0,
-            created_total: 0,
-            existing_total: 0,
-            duration_ms: 0,
-            scripts_path: scriptsPath,
-            data_path: dataPath,
-            warnings: [],
-            errors: [
-                `Failed to parse JSON output: ${e instanceof Error ? e.message : String(e)}`,
-                `stdout: ${result.stdout}`,
-                `stderr: ${result.stderr}`,
-            ],
-        };
-    }
+export function runSyncFull(binaryPath: string, config: SandboxConfig): Promise<SyncFullResult> {
+    return runJson(binaryPath, ['sync-full', ...baseArgs(config)]);
 }
 
 /**
- * Runs ensure-path command
+ * Makes sure a relative folder exists on both sides (the "micro-sync").
+ * Does nothing if both folders are already there. Throws if it fails.
  */
-export async function runEnsurePath(
+export async function ensurePairedFolders(
     binaryPath: string,
-    scriptsPath: string,
-    dataPath: string,
-    relativePath: string
-): Promise<EnsurePathResult> {
-    const args = [
+    config: SandboxConfig,
+    rel: string
+): Promise<void> {
+    if (isDirectory(sidePath(config, 'scripts', rel)) && isDirectory(sidePath(config, 'data', rel))) {
+        return;
+    }
+
+    const result = await runJson<EnsurePathResult>(binaryPath, [
         'ensure-path',
-        '--scripts',
-        scriptsPath,
-        '--data',
-        dataPath,
+        ...baseArgs(config),
         '--relative',
-        relativePath,
-        '--json',
-    ];
-
-    const result = await executeSandboxSync(binaryPath, args);
-
-    // Parse JSON output
-    try {
-        const output: EnsurePathResult = JSON.parse(result.stdout);
-        return output;
-    } catch (e) {
-        // JSON parsing failed, return error result
-        return {
-            ok: false,
-            ensured_relative: relativePath,
-            ensured_scripts_path: path.join(scriptsPath, relativePath),
-            ensured_data_path: path.join(dataPath, relativePath),
-            created_in_scripts_chain: 0,
-            created_in_data_chain: 0,
-            duration_ms: 0,
-            scripts_path: scriptsPath,
-            data_path: dataPath,
-            warnings: [],
-            errors: [
-                `Failed to parse JSON output: ${e instanceof Error ? e.message : String(e)}`,
-                `stdout: ${result.stdout}`,
-                `stderr: ${result.stderr}`,
-            ],
-        };
+        rel,
+    ]);
+    if (!result.ok) {
+        throw new Error(result.errors.join('; ') || 'ensure-path failed');
     }
 }

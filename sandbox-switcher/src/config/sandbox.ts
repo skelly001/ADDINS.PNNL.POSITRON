@@ -1,272 +1,148 @@
-import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
-import { loadRenviron, validateRenvironConfig, RenvironConfig } from './renviron';
+import * as path from 'path';
+import { loadRenviron } from './renviron';
 
 /**
- * The canonical segment name we're looking for (case-sensitive)
+ * A folder is the scripts sandbox root if its name starts with this
+ * (case-sensitive), e.g. `r_script_sandbox`, `r_script_sandbox2`.
  */
-const SANDBOX_SEGMENT = 'r_script_sandbox';
+export const SANDBOX_PREFIX = 'r_script_sandbox';
 
-/**
- * Check if a segment matches the sandbox pattern.
- * Matches either exact 'r_script_sandbox' or segments starting with 'r_script_sandbox'
- * (e.g., 'r_script_sandbox2', 'r_script_sandbox_test')
- */
-function isSandboxSegment(segment: string): boolean {
-    return segment === SANDBOX_SEGMENT || segment.startsWith(SANDBOX_SEGMENT);
-}
+export type Side = 'scripts' | 'data';
 
-/**
- * Sandbox configuration and state
- */
+/** The two sandbox roots, as clean absolute paths. */
 export interface SandboxConfig {
     scriptsPath: string;
     dataPath: string;
-    derivedScriptsBase: string;
-    isDataPathAvailable: boolean;
-    renvironConfig: RenvironConfig;
+}
+
+/** Outcome of looking for a sandbox among the open workspace folders. */
+export type Detection =
+    | { kind: 'none' }
+    | { kind: 'invalid'; base: string; error: string }
+    | { kind: 'ok'; config: SandboxConfig; warnings: string[] };
+
+export function otherSide(side: Side): Side {
+    return side === 'scripts' ? 'data' : 'scripts';
+}
+
+/** Normalizes a path and removes trailing separators (except on a root). */
+export function cleanPath(p: string): string {
+    const normalized = path.normalize(p);
+    const root = path.parse(normalized).root;
+    let end = normalized.length;
+    while (end > root.length && (normalized[end - 1] === path.sep || normalized[end - 1] === '/')) {
+        end--;
+    }
+    return normalized.substring(0, end);
+}
+
+/** Form of a path used for comparisons: case-insensitive on Windows. */
+function comparable(p: string): string {
+    return process.platform === 'win32' ? p.toLowerCase() : p;
+}
+
+/** True if two paths point at the same location after cleaning. */
+export function samePath(a: string, b: string): boolean {
+    return comparable(cleanPath(a)) === comparable(cleanPath(b));
 }
 
 /**
- * Result of sandbox detection
+ * Returns `target` relative to `base` ('' if they are the same folder), or
+ * null if `target` is not inside `base`.
  */
-export interface SandboxDetectionResult {
-    found: boolean;
-    config?: SandboxConfig;
-    warnings: string[];
-    errors: string[];
-}
+export function relativeWithin(base: string, target: string): string | null {
+    const cleanBase = cleanPath(base);
+    const cleanTarget = cleanPath(target);
 
-/**
- * Detects if a workspace folder path contains the r_script_sandbox segment.
- * Uses CASE-SENSITIVE exact segment matching per CLAUDE.md spec.
- *
- * Returns the derived scripts base (path up to and including r_script_sandbox).
- */
-export function detectSandboxBase(folderPath: string): string | null {
-    // Normalize the path and split into segments
-    const normalized = path.normalize(folderPath);
-    const segments = normalized.split(path.sep);
+    if (comparable(cleanTarget) === comparable(cleanBase)) {
+        return '';
+    }
 
-    // Find the r_script_sandbox segment (case-sensitive, or starting with r_script_sandbox)
-    const sandboxIndex = segments.findIndex(seg => isSandboxSegment(seg));
-
-    if (sandboxIndex === -1) {
+    const prefix = cleanBase.endsWith(path.sep) ? cleanBase : cleanBase + path.sep;
+    if (!comparable(cleanTarget).startsWith(comparable(prefix))) {
         return null;
     }
+    return cleanTarget.substring(prefix.length);
+}
 
-    // Derive the base by taking segments up to and including r_script_sandbox
-    const baseSegments = segments.slice(0, sandboxIndex + 1);
-    const base = baseSegments.join(path.sep);
+/** Finds which sandbox a path is in and its path relative to that root. */
+export function locate(p: string, config: SandboxConfig): { side: Side; rel: string } | null {
+    const scriptsRel = relativeWithin(config.scriptsPath, p);
+    if (scriptsRel !== null) {
+        return { side: 'scripts', rel: scriptsRel };
+    }
+    const dataRel = relativeWithin(config.dataPath, p);
+    if (dataRel !== null) {
+        return { side: 'data', rel: dataRel };
+    }
+    return null;
+}
 
-    // Handle absolute paths on Windows and Unix
-    if (path.isAbsolute(normalized)) {
-        return base;
-    } else {
-        // This shouldn't happen with workspace folders, but handle it gracefully
-        return path.resolve(base);
+/** Absolute path of a relative folder on the given side. */
+export function sidePath(config: SandboxConfig, side: Side, rel: string): string {
+    const root = side === 'scripts' ? config.scriptsPath : config.dataPath;
+    return rel ? path.join(root, rel) : root;
+}
+
+export function isDirectory(p: string): boolean {
+    try {
+        return fs.statSync(p).isDirectory();
+    } catch {
+        return false;
     }
 }
 
 /**
- * Detects sandbox configuration from workspace folders.
- *
- * Per CLAUDE.md spec:
- * 1. Find a workspace folder with r_script_sandbox segment (case-sensitive)
- * 2. Derive scripts base by truncating at r_script_sandbox (inclusive)
- * 3. Load .Renviron from derived scripts base
- * 4. Validate SCRIPT_PATH from .Renviron matches derived base
- * 5. Check DATA_PATH availability
+ * If a folder path contains a segment starting with `r_script_sandbox`
+ * (case-sensitive), returns the path truncated at that segment (inclusive).
  */
-export function detectSandbox(): SandboxDetectionResult {
-    const warnings: string[] = [];
-    const errors: string[] = [];
-
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        return {
-            found: false,
-            warnings,
-            errors: ['No workspace folders open'],
-        };
+export function detectSandboxBase(folderPath: string): string | null {
+    const segments = cleanPath(folderPath).split(path.sep);
+    const index = segments.findIndex((segment) => segment.startsWith(SANDBOX_PREFIX));
+    if (index === -1) {
+        return null;
     }
+    return segments.slice(0, index + 1).join(path.sep);
+}
 
-    // Search for a folder containing r_script_sandbox
-    let derivedBase: string | null = null;
-    for (const folder of workspaceFolders) {
-        const base = detectSandboxBase(folder.uri.fsPath);
+/**
+ * Detects the sandbox from the open workspace folders:
+ * the first folder inside an `r_script_sandbox*` folder gives the scripts
+ * root, and the .Renviron in that root gives DATA_PATH.
+ */
+export function detectSandbox(folderPaths: string[]): Detection {
+    let base: string | null = null;
+    for (const folderPath of folderPaths) {
+        base = detectSandboxBase(folderPath);
         if (base) {
-            derivedBase = base;
             break;
         }
     }
-
-    if (!derivedBase) {
-        return {
-            found: false,
-            warnings,
-            errors: ['No workspace folder contains "r_script_sandbox" segment (case-sensitive)'],
-        };
+    if (!base) {
+        return { kind: 'none' };
     }
 
-    // Load .Renviron from derived base
-    let renvironConfig: RenvironConfig;
+    let renviron;
     try {
-        const config = loadRenviron(derivedBase);
-        if (!config) {
-            return {
-                found: false,
-                warnings,
-                errors: [`.Renviron not found in ${derivedBase}`],
-            };
-        }
-        renvironConfig = config;
+        renviron = loadRenviron(base);
     } catch (e) {
-        return {
-            found: false,
-            warnings,
-            errors: [`Failed to load .Renviron: ${e instanceof Error ? e.message : String(e)}`],
-        };
+        return { kind: 'invalid', base, error: e instanceof Error ? e.message : String(e) };
     }
 
-    // Validate .Renviron config
-    const validationErrors = validateRenvironConfig(renvironConfig);
-    if (validationErrors.length > 0) {
-        return {
-            found: false,
-            warnings,
-            errors: validationErrors,
-        };
-    }
-
-    // Normalize both paths for comparison (case-insensitive on Windows)
-    const normalizedDerived = normalizePathForComparison(derivedBase);
-    const normalizedScriptPath = normalizePathForComparison(renvironConfig.SCRIPT_PATH);
-
-    // Check if SCRIPT_PATH matches derived base
-    if (normalizedDerived !== normalizedScriptPath) {
+    const warnings: string[] = [];
+    let scriptsPath = base;
+    if (renviron.scriptPath !== undefined && !samePath(renviron.scriptPath, base)) {
         warnings.push(
-            `SCRIPT_PATH from .Renviron (${renvironConfig.SCRIPT_PATH}) does not match derived base (${derivedBase}). Using .Renviron values.`
+            `SCRIPT_PATH in .Renviron (${renviron.scriptPath}) differs from the detected ` +
+                `sandbox root (${base}). Using the .Renviron value.`
         );
-    }
-
-    // Check DATA_PATH availability
-    const isDataPathAvailable = fs.existsSync(renvironConfig.DATA_PATH) &&
-        fs.statSync(renvironConfig.DATA_PATH).isDirectory();
-
-    if (!isDataPathAvailable) {
-        warnings.push(
-            `DATA_PATH (${renvironConfig.DATA_PATH}) is not available or not accessible`
-        );
+        scriptsPath = renviron.scriptPath;
     }
 
     return {
-        found: true,
-        config: {
-            scriptsPath: renvironConfig.SCRIPT_PATH,
-            dataPath: renvironConfig.DATA_PATH,
-            derivedScriptsBase: derivedBase,
-            isDataPathAvailable,
-            renvironConfig,
-        },
+        kind: 'ok',
+        config: { scriptsPath: cleanPath(scriptsPath), dataPath: cleanPath(renviron.dataPath) },
         warnings,
-        errors,
     };
-}
-
-/**
- * Normalizes a path for comparison, handling case-insensitivity on Windows.
- */
-function normalizePathForComparison(p: string): string {
-    const normalized = path.normalize(p);
-    // On Windows, paths are case-insensitive, so lowercase for comparison
-    if (process.platform === 'win32') {
-        return normalized.toLowerCase();
-    }
-    return normalized;
-}
-
-/**
- * Determines which sandbox (scripts or data) a given path belongs to.
- * Returns 'scripts', 'data', or null if outside both.
- */
-export function determinePathContext(
-    filePath: string,
-    config: SandboxConfig
-): 'scripts' | 'data' | null {
-    const normalizedPath = normalizePathForComparison(filePath);
-    const normalizedScripts = normalizePathForComparison(config.scriptsPath);
-    const normalizedData = normalizePathForComparison(config.dataPath);
-
-    if (normalizedPath.startsWith(normalizedScripts + path.sep) ||
-        normalizedPath === normalizedScripts) {
-        return 'scripts';
-    }
-
-    if (normalizedPath.startsWith(normalizedData + path.sep) ||
-        normalizedPath === normalizedData) {
-        return 'data';
-    }
-
-    return null;
-}
-
-/**
- * Computes the relative path from a base to a target.
- * Returns null if target is not within base.
- */
-export function getRelativePath(base: string, target: string): string | null {
-    const normalizedBase = path.normalize(base);
-    const normalizedTarget = path.normalize(target);
-
-    // Use case-insensitive comparison on Windows
-    const baseForComparison = normalizePathForComparison(base);
-    const targetForComparison = normalizePathForComparison(target);
-
-    if (!targetForComparison.startsWith(baseForComparison)) {
-        return null;
-    }
-
-    const rel = path.relative(normalizedBase, normalizedTarget);
-
-    // Check if the relative path tries to escape (contains ..)
-    if (rel.includes('..')) {
-        return null;
-    }
-
-    return rel;
-}
-
-/**
- * Computes the paired path in the opposite sandbox.
- * E.g., scripts/analysis -> data/analysis
- */
-export function getPairedPath(
-    sourcePath: string,
-    config: SandboxConfig
-): { pairedPath: string; relativePath: string } | null {
-    const context = determinePathContext(sourcePath, config);
-
-    if (context === 'scripts') {
-        const rel = getRelativePath(config.scriptsPath, sourcePath);
-        if (rel === null) {
-            return null;
-        }
-        return {
-            pairedPath: path.join(config.dataPath, rel),
-            relativePath: rel,
-        };
-    } else if (context === 'data') {
-        const rel = getRelativePath(config.dataPath, sourcePath);
-        if (rel === null) {
-            return null;
-        }
-        return {
-            pairedPath: path.join(config.scriptsPath, rel),
-            relativePath: rel,
-        };
-    }
-
-    return null;
 }

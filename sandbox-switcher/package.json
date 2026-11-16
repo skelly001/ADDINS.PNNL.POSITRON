@@ -2,7 +2,7 @@
   "name": "sandbox-switcher",
   "displayName": "Sandbox Switcher",
   "description": "Quickly switch between R script and data sandboxes in Positron",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "pnnl",
   "engines": {
     "vscode": "^1.80.0"
@@ -29,10 +29,6 @@
         "title": "Sandbox: Sync Directories Now"
       },
       {
-        "command": "sandbox.addDataRoot",
-        "title": "Sandbox: Add Data Workspace Root"
-      },
-      {
         "command": "sandbox.setupWorkspaceFolders",
         "title": "Sandbox: Setup Paired Workspace Folders"
       }
@@ -44,15 +40,24 @@
         "mac": "cmd+alt+w",
         "linux": "ctrl+alt+w"
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "sandbox.revealPairedFolder",
+          "when": "sandbox.active",
+          "group": "navigation@90"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package",
+    "package": "vsce package --allow-missing-repository",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "npm run compile && node --test out/test/"
   },
   "devDependencies": {
     "@types/node": "^20.x",
@@ -61,8 +66,7 @@
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0",
-    "@vscode/vsce": "^2.22.0",
-    "@vscode/test-electron": "^2.3.0",
-    "mocha": "^10.2.0"
-  }
+    "@vscode/vsce": "^2.22.0"
+  },
+  "license": "MIT"
 }

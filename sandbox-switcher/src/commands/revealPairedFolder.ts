@@ -1,81 +1,59 @@
-import * as vscode from 'vscode';
 import * as path from 'path';
-import { SandboxConfig, getPairedPath } from '../config/sandbox';
-import { runEnsurePath } from '../utils/cli';
-import { SessionState } from '../utils/state';
-import { SandboxUI } from '../utils/ui';
+import * as vscode from 'vscode';
+import { SandboxConfig, isDirectory, locate, otherSide, sidePath } from '../config/sandbox';
+import { ensurePairedFolders } from '../utils/cli';
+import { errorMessage } from '../utils/ui';
+import { CommandContext, activeSavedFile, revealInWorkspace } from './context';
+
+/** Folder to start from: the explorer selection if given, else the active file's folder. */
+function sourceFolder(selected?: vscode.Uri): string | null {
+    if (selected?.scheme === 'file') {
+        return isDirectory(selected.fsPath) ? selected.fsPath : path.dirname(selected.fsPath);
+    }
+    const file = activeSavedFile();
+    return file ? path.dirname(file) : null;
+}
 
 /**
- * Implements the revealPairedFolder command per CLAUDE.md spec.
- *
- * Computes the paired folder path and reveals it in the explorer.
- * Runs ensure-path to guarantee the paired folder exists.
+ * Reveals the folder paired with the selected (or active) one in the
+ * explorer, creating the paired folders first if needed.
  */
 export async function revealPairedFolder(
     config: SandboxConfig,
-    binaryPath: string,
-    state: SessionState,
-    ui: SandboxUI,
-    contextPath?: string
+    ctx: CommandContext,
+    selected?: vscode.Uri
 ): Promise<void> {
-    // Use provided context or get from active editor
-    let sourcePath = contextPath;
-    if (!sourcePath) {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor) {
-            sourcePath = path.dirname(activeEditor.document.uri.fsPath);
-        }
-    }
+    const { ui } = ctx;
 
-    if (!sourcePath) {
-        ui.showWarning('No active file or folder');
+    const source = sourceFolder(selected);
+    if (!source) {
+        ui.status('warning', 'No saved file or folder to reveal the pair of');
         return;
     }
 
-    // Get paired path
-    const paired = getPairedPath(sourcePath, config);
-    if (!paired) {
-        ui.showWarning('Path is outside sandbox boundaries');
-        ui.log(`revealPairedFolder: ${sourcePath} is outside sandboxes`);
+    const located = locate(source, config);
+    if (!located) {
+        ui.status('warning', 'Path is outside the sandbox');
         return;
     }
 
-    const { pairedPath, relativePath } = paired;
-
-    // Ensure the path exists
-    if (!state.isPathEnsured(relativePath)) {
-        try {
-            ui.log(`Ensuring path for reveal: ${relativePath}`);
-            const result = await runEnsurePath(
-                binaryPath,
-                config.scriptsPath,
-                config.dataPath,
-                relativePath
-            );
-
-            if (result.ok) {
-                state.markPathEnsured(relativePath);
-                ui.log(`Path ensured: ${relativePath}`);
-            } else {
-                ui.showError(`Failed to ensure path: ${result.errors[0]}`);
-                ui.log(`Ensure path failed: ${result.errors.join(', ')}`);
-                return;
-            }
-        } catch (e) {
-            ui.showError('Failed to ensure path');
-            ui.log(`Ensure path error: ${e instanceof Error ? e.message : String(e)}`);
-            return;
-        }
+    if (!isDirectory(config.dataPath)) {
+        ui.notifyWarning(`DATA_PATH is not available (${config.dataPath}). Nothing revealed.`);
+        return;
     }
 
-    // Reveal in explorer
+    const pairedPath = sidePath(config, otherSide(located.side), located.rel);
     try {
-        const uri = vscode.Uri.file(pairedPath);
-        await vscode.commands.executeCommand('revealInExplorer', uri);
-        ui.showSuccess('Revealed paired folder');
-        ui.log(`Revealed: ${pairedPath}`);
+        await ensurePairedFolders(ctx.binaryPath, config, located.rel);
+        if (await revealInWorkspace(pairedPath)) {
+            ui.status('success', `Revealed ${pairedPath}`);
+        } else {
+            ui.status(
+                'warning',
+                'Paired folder is not in the workspace. Run "Sandbox: Setup Paired Workspace Folders".'
+            );
+        }
     } catch (e) {
-        ui.showError('Failed to reveal folder');
-        ui.log(`Reveal error: ${e instanceof Error ? e.message : String(e)}`);
+        ui.status('error', `Could not reveal paired folder: ${errorMessage(e)}`);
     }
 }

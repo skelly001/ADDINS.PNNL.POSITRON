@@ -2,56 +2,39 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Configuration loaded from .Renviron file
+ * Sandbox settings read from the project-root .Renviron file.
+ * DATA_PATH is required. SCRIPT_PATH is optional because the scripts root is
+ * the folder that holds the .Renviron file.
  */
 export interface RenvironConfig {
-    SCRIPT_PATH: string;
-    DATA_PATH: string;
-    [key: string]: string;
+    scriptPath?: string;
+    dataPath: string;
 }
 
 /**
- * Parses a .Renviron file according to the CLAUDE.md spec:
- * - Simple KEY=VALUE format
- * - Optional quotes around values
- * - Ignores empty lines and comments (lines starting with #)
- * - Trims whitespace
- * - Preserves UTF-8
+ * Parses .Renviron content: KEY=VALUE lines with optional quotes around the
+ * value. Empty lines, comments and lines without '=' are ignored.
  */
 export function parseRenviron(content: string): Map<string, string> {
     const result = new Map<string, string>();
-    const lines = content.split('\n');
 
-    for (const line of lines) {
-        // Trim whitespace
+    for (const line of content.split('\n')) {
         const trimmed = line.trim();
-
-        // Skip empty lines
-        if (trimmed.length === 0) {
+        if (trimmed.length === 0 || trimmed.startsWith('#')) {
             continue;
         }
 
-        // Skip comments
-        if (trimmed.startsWith('#')) {
-            continue;
-        }
-
-        // Parse KEY=VALUE
         const equalIndex = trimmed.indexOf('=');
         if (equalIndex === -1) {
-            // Invalid line, skip it
             continue;
         }
 
         const key = trimmed.substring(0, equalIndex).trim();
         let value = trimmed.substring(equalIndex + 1).trim();
 
-        // Remove surrounding quotes if present
-        if (value.length >= 2) {
-            if ((value.startsWith('"') && value.endsWith('"')) ||
-                (value.startsWith("'") && value.endsWith("'"))) {
-                value = value.substring(1, value.length - 1);
-            }
+        const quote = value[0];
+        if (value.length >= 2 && (quote === '"' || quote === "'") && value.endsWith(quote)) {
+            value = value.substring(1, value.length - 1);
         }
 
         if (key.length > 0) {
@@ -63,58 +46,38 @@ export function parseRenviron(content: string): Map<string, string> {
 }
 
 /**
- * Loads and parses a .Renviron file from the given directory.
- * Returns null if the file doesn't exist.
- * Throws an error if the file exists but can't be read.
+ * Loads the sandbox settings from `<basePath>/.Renviron`.
+ * Throws an Error with a user-readable message if the file is missing,
+ * unreadable, or does not define a usable DATA_PATH.
  */
-export function loadRenviron(basePath: string): RenvironConfig | null {
+export function loadRenviron(basePath: string): RenvironConfig {
     const renvironPath = path.join(basePath, '.Renviron');
 
-    if (!fs.existsSync(renvironPath)) {
-        return null;
-    }
-
-    const content = fs.readFileSync(renvironPath, 'utf8');
-    const env = parseRenviron(content);
-
-    const scriptPath = env.get('SCRIPT_PATH');
-    const dataPath = env.get('DATA_PATH');
-
-    if (!scriptPath || !dataPath) {
+    let content: string;
+    try {
+        content = fs.readFileSync(renvironPath, 'utf8');
+    } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code;
         throw new Error(
-            '.Renviron is missing required keys. Both SCRIPT_PATH and DATA_PATH must be defined.'
+            code === 'ENOENT'
+                ? `.Renviron not found in ${basePath}`
+                : `Cannot read ${renvironPath}: ${(e as Error).message}`
         );
     }
 
-    // Build result object
-    const config: RenvironConfig = {
-        SCRIPT_PATH: scriptPath,
-        DATA_PATH: dataPath,
-    };
+    const env = parseRenviron(content);
+    const dataPath = env.get('DATA_PATH');
+    const scriptPath = env.get('SCRIPT_PATH') || undefined;
 
-    // Include any other keys that were found
-    env.forEach((value, key) => {
-        if (key !== 'SCRIPT_PATH' && key !== 'DATA_PATH') {
-            config[key] = value;
-        }
-    });
-
-    return config;
-}
-
-/**
- * Validates that the SCRIPT_PATH and DATA_PATH are absolute paths.
- */
-export function validateRenvironConfig(config: RenvironConfig): string[] {
-    const errors: string[] = [];
-
-    if (!path.isAbsolute(config.SCRIPT_PATH)) {
-        errors.push(`SCRIPT_PATH must be an absolute path, got: ${config.SCRIPT_PATH}`);
+    if (!dataPath) {
+        throw new Error(`${renvironPath} must define DATA_PATH`);
+    }
+    if (!path.isAbsolute(dataPath)) {
+        throw new Error(`DATA_PATH must be an absolute path, got: ${dataPath}`);
+    }
+    if (scriptPath !== undefined && !path.isAbsolute(scriptPath)) {
+        throw new Error(`SCRIPT_PATH must be an absolute path, got: ${scriptPath}`);
     }
 
-    if (!path.isAbsolute(config.DATA_PATH)) {
-        errors.push(`DATA_PATH must be an absolute path, got: ${config.DATA_PATH}`);
-    }
-
-    return errors;
+    return { scriptPath, dataPath };
 }

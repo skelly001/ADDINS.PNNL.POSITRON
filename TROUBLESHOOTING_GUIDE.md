@@ -1,194 +1,175 @@
 # Troubleshooting Guide for Sandbox Switcher
 
-## Updated Extension (v0.1.0 - Latest Build)
+Applies to extension version 0.2.0.
 
-I've rebuilt the extension with three critical fixes:
-
-1. **Case-insensitive path comparison on Windows**: Fixed the main issue where paths like `C:\Users\...` and `c:\Users\...` were treated as different (CRITICAL FIX)
-2. **Path separator fix**: Changed hardcoded `/` to use `path.sep` for Windows compatibility when extracting folder names
-3. **Flexible sandbox detection**: Now accepts folders starting with `r_script_sandbox` (not just exact match)
-
-**New .vsix location**: `/workspace/sandbox-switcher/sandbox-switcher-0.1.0.vsix`
-
-## What Was Fixed
-
-### The Case Sensitivity Bug (SOLVED)
-
-**Your error message**:
-```
-switchWdOpposite: Path c:\Users\kell343\dev\r_script_sandbox\project1 is outside sandboxes
-```
-
-**Root cause**: Windows normalizes paths with lowercase drive letters (`c:\`), but your `.Renviron` had uppercase (`C:\`). The extension was doing case-sensitive string comparison, so it thought `c:\Users\...` was outside of `C:\Users\...`.
-
-**Fix**: All path comparisons now use `.toLowerCase()` on Windows, making them case-insensitive as they should be.
-
-## What to Check
-
-### 1. View Output Logs
+## 1. View the output log
 
 In Positron, open the Output panel:
 - **View → Output**
 - Select **"Sandbox Sync"** from the dropdown
 
-You should see logs like:
+When Positron is opened inside the sandbox you should see:
 ```
-Sandbox Switcher extension activating...
-Sandbox detected:
-  Scripts path: C:\Users\kell343\dev\r_script_sandbox
-  Data path: C:\Users\kell343\OneDrive - PNNL\Documents\data_sandbox
-  Data available: true
-Binary path: C:\Users\kell343\.positron\extensions\pnnl.sandbox-switcher-0.1.0\bin\win32-x64\sandbox-sync.exe
-Added 2 workspace root(s)
-Sandbox Switcher activated successfully
+Sandbox detected. Scripts: C:\Users\kell343\dev\r_script_sandbox  Data: C:\Users\kell343\Cloud Drive\Documents\data_sandbox
+sandbox-sync binary: C:\Users\kell343\.positron\extensions\pnnl.sandbox-switcher-0.2.0\bin\win32-x64\sandbox-sync.exe
 ```
 
-### 2. Common Issues and What Logs Will Show
+Short messages (success, warnings) appear for a few seconds at the left of the
+status bar, the strip along the bottom of the window. Every one of them is also
+written to this log.
 
-#### Issue: "Sandbox not detected"
+## 2. Common issues
 
-**Logs will show:**
+#### The extension does nothing in my folder
+
+**Log shows:**
 ```
-Sandbox not detected:
-  Error: No workspace folder contains "r_script_sandbox" segment (case-sensitive)
+No sandbox detected in the open folders.
 ```
+
+This is silent by design: in a folder that is not part of a sandbox, the
+extension shows no popup. Running a sandbox command there shows
+"Not inside an r_script_sandbox folder" in the status bar.
 
 **Fix:**
-- Make sure you've opened the correct folder in Positron
-- The folder path must contain `r_script_sandbox` as an exact segment
-- Example: `C:\Users\kell343\dev\r_script_sandbox` ✓
+- Open a folder whose path contains a folder named `r_script_sandbox` (or a
+  name starting with it, such as `r_script_sandbox2`). The match is
+  case-sensitive.
+- Example: `C:\Users\kell343\dev\r_script_sandbox\ROSMAP_SRM` ✓
 - Example: `C:\Users\kell343\dev\my_r_scripts` ✗
 
-#### Issue: ".Renviron not found or invalid"
+#### Popup: ".Renviron not found" or "must define DATA_PATH"
 
-**Logs will show:**
-```
-Sandbox not detected:
-  Error: .Renviron not found in C:\Users\kell343\dev\r_script_sandbox
-```
+You are inside a sandbox, but its configuration is missing or invalid.
 
 **Fix:**
-- Create `.Renviron` in your r_script_sandbox folder
-- Must contain:
+- Create `.Renviron` in the root of your `r_script_sandbox` folder containing:
   ```
-  SCRIPT_PATH="C:/Users/kell343/dev/r_script_sandbox"
-  DATA_PATH="C:/Users/kell343/OneDrive - PNNL/Documents/data_sandbox"
+  DATA_PATH="C:/Users/kell343/Cloud Drive/Documents/data_sandbox"
   ```
-- Use forward slashes even on Windows
-- Use quotes if paths contain spaces
+- Use an absolute path, forward slashes (also on Windows), and quotes if the
+  path contains spaces.
+- The fix is picked up the next time you run a command; no reload is needed.
 
-#### Issue: "DATA_PATH not available"
+#### `Sys.getenv("DATA_PATH")` is empty in R / no sync message at startup
 
-**Logs will show:**
-```
-Sandbox detected:
-  Scripts path: C:\Users\kell343\dev\r_script_sandbox
-  Data path: C:\Users\kell343\OneDrive - PNNL\Documents\data_sandbox
-  Data available: false
-  Warning: DATA_PATH (...) is not available or not accessible
-```
+R only gets the paths, and only runs the startup sync, through the block in
+your home `.Rprofile`.
 
-**What this means:**
-- Extension activated successfully
-- Scripts workspace root was added
-- Data workspace root was NOT added (OneDrive folder doesn't exist or isn't synced)
+**Check:**
+- Is the block from `examples/.Rprofile.template` in `~/.Rprofile`? (Run
+  `path.expand("~/.Rprofile")` in R to see where that file is.)
+- Does the folder you opened have its own `.Rprofile`? R then skips the home
+  one. Add `source("~/.Rprofile")` as its first line. An old `.Rprofile` left
+  in the sandbox root has the same effect when you open the root: delete it.
+- Did the console print `sandbox-sync: binary not found on PATH`? Then install
+  the binary on your PATH (see the Quick Start).
 
-**Fix:**
-- Ensure OneDrive is running and synced
-- Check that the DATA_PATH in .Renviron points to an existing folder
-- Run command "Sandbox: Add Data Workspace Root" after OneDrive is available
+#### R and the extension use different paths
 
-#### Issue: "No active file or folder to switch from"
+The root `.Renviron` is the only record of the paths. If you copied
+`SCRIPT_PATH` and `DATA_PATH` into `~/.Renviron` for an earlier version, remove
+them there. (Inside the sandbox the `~/.Rprofile` block overrides them with the
+root values, but outside it they would still be set.)
 
-**When you press Ctrl+Alt+W, logs will show:**
-```
-switchWdOpposite: No context path found
-```
+#### "DATA_PATH is not available"
 
-**What this means:**
-- Extension is working
-- But you don't have an R file open in the editor
-
-**Fix:**
-- Open an R file (e.g., `analysis/test.R`) in the editor
-- Make sure the file is under your r_script_sandbox folder
-- Then press Ctrl+Alt+W
-
-#### Issue: "No R terminal found"
-
-**Logs will show:**
-```
-(after the context is determined successfully, but then...)
-No R terminal found
-```
-
-**Fix:**
-- Start an R terminal in Positron (Terminal → New Terminal → R)
-- Make sure it's named with "R" in the title
-- Then try Ctrl+Alt+W again
-
-#### Issue: "Current path is outside sandbox boundaries"
-
-**Logs will show:**
-```
-switchWdOpposite: Path C:\Users\kell343\Documents\other_project is outside sandboxes
-```
+The folder in `DATA_PATH` does not exist right now (for example the cloud drive is
+not running or not synced).
 
 **What this means:**
-- You're trying to switch from a file that's not in r_script_sandbox or data_sandbox
+- Switching to the Data side and revealing paired folders do nothing and show
+  this warning. The R session is left untouched.
+- **Sandbox: Setup Paired Workspace Folders** adds only the Scripts folder.
 
 **Fix:**
-- Navigate to a file inside your r_script_sandbox folder first
-- Then press Ctrl+Alt+W
+- Make sure the cloud drive is running and synced, and that `DATA_PATH` in the root
+  `.Renviron` points to an existing folder.
+- Then just use the command again. Availability is checked every time; no
+  reload is needed. Run **Sandbox: Setup Paired Workspace Folders** again to
+  add the Data folder.
 
-## Step-by-Step Testing
+#### "Open a file in a project folder to switch"
 
-1. **Install the new .vsix**:
+Pressing Ctrl+Alt+W found no project folder to switch within. This happens
+when Positron is opened at the sandbox root and the active tab is not a saved
+file inside a project folder (an unsaved file, a file in the sandbox root, a
+file outside the sandbox, or a non-file tab). R is never sent to the top of
+either sandbox.
+
+**Fix:**
+- Open a saved file in the project folder you want, then press Ctrl+Alt+W, or
+- Open Positron at the project folder itself (then the shortcut works from any
+  tab).
+
+#### The working directory did not change
+
+- The switch sends `setwd()` to the Positron R console: make sure an R session
+  is running in the Console pane.
+- Look in the console for an R error, and in the log for the `Sent setwd(...)`
+  line to see the exact path used.
+- The first press for a folder goes to Data; the next press for the same
+  folder goes back to Scripts. If you changed directory yourself in R, the
+  extension does not know: press the shortcut again to get to the other side.
+
+#### "Paired folder is not in the workspace"
+
+**Sandbox: Reveal Paired Folder** can only show folders that are in the
+explorer. Run **Sandbox: Setup Paired Workspace Folders** first.
+
+#### "sandbox-sync binary not found"
+
+The extension uses the binary bundled for your platform
+(`bin/win32-x64`, `bin/linux-x64`, `bin/darwin-arm64`) and otherwise looks for
+`sandbox-sync` on your PATH. On other platforms (for example Intel Macs), build
+it with `cargo build --release` in `sandbox-sync/` and put it on your PATH.
+
+#### Sync reports "a file with that name already exists"
+
+A folder on one side has the same name as a file on the other side, so the
+folder cannot be mirrored. Rename or move the file. The rest of the tree is
+still synced.
+
+## 3. Step-by-step test
+
+1. **Install the .vsix**
    - In Positron: Extensions → ... menu → Install from VSIX
-   - Select `/workspace/sandbox-switcher/sandbox-switcher-0.1.0.vsix`
-   - Reload Positron window (Ctrl+Shift+P → "Developer: Reload Window")
+   - Select `sandbox-switcher/sandbox-switcher-0.2.0.vsix`
+   - Reload the window (Ctrl+Shift+P → "Developer: Reload Window")
 
-2. **Check activation logs**:
-   - View → Output → "Sandbox Sync"
-   - Confirm "Sandbox Switcher activated successfully"
-   - Share the full log if you see any errors
+2. **Check the log** (View → Output → "Sandbox Sync") for "Sandbox detected".
 
-3. **Verify workspace roots**:
-   - You should see two roots in the Explorer:
-     - "Scripts: r_script_sandbox" (or similar)
-     - "Data: data_sandbox" (if DATA_PATH is available)
+3. **Start R** in a project folder. The console should print one line such as
+   `sandbox-sync: Synced 142 directories (0 created, 142 existing) in 23ms`,
+   and `Sys.getenv("DATA_PATH")` should return your data sandbox.
 
-4. **Test switchWdOpposite**:
-   - Open an R file (e.g., `analysis/test.R`) in r_script_sandbox
-   - Start an R terminal (Terminal → New Terminal → R)
-   - Press **Ctrl+Alt+W**
-   - Check logs for what happened
+4. **Test the switch**
+   - Open a saved R file in a project folder, e.g. `ROSMAP_SRM/analysis/test.R`
+   - Press **Ctrl+Alt+W**: the status bar shows
+     `R working directory → Data: analysis` and `getwd()` in R agrees
+   - Press it again: `R working directory → Scripts: analysis`
 
-5. **Expected success logs**:
-   ```
-   switchWdOpposite: Context=scripts, Relative=analysis
-   Ensuring path: analysis
-   Path ensured: analysis (45ms)
-   setwd sent: C:\Users\kell343\OneDrive - PNNL\Documents\data_sandbox\analysis
-   Revealed in explorer: C:\Users\kell343\OneDrive - PNNL\Documents\data_sandbox\analysis
-   ```
+5. **Test the safe cases**
+   - Open Positron at the sandbox root, make a new unsaved file, press
+     Ctrl+Alt+W: the status bar shows "Open a file in a project folder to
+     switch" and `getwd()` is unchanged
+   - Open Positron in a folder outside the sandbox: no popup appears
 
-## Quick Diagnostic Checklist
+## Quick diagnostic checklist
 
-- [ ] Folder contains `r_script_sandbox` in the path?
-- [ ] `.Renviron` exists in r_script_sandbox root?
-- [ ] `.Renviron` has SCRIPT_PATH and DATA_PATH defined?
-- [ ] Both paths in `.Renviron` exist on disk?
-- [ ] OneDrive is running and synced?
-- [ ] Extension shows in Output: "Sandbox Switcher activated successfully"?
-- [ ] Both workspace roots visible in Explorer?
-- [ ] R file is open in the editor when pressing Ctrl+Alt+W?
-- [ ] R terminal is running?
+- [ ] Folder path contains a folder whose name starts with `r_script_sandbox`?
+- [ ] `.Renviron` exists in the sandbox root and defines `DATA_PATH`?
+- [ ] The `DATA_PATH` folder exists on disk (cloud drive running and synced)?
+- [ ] The startup block is in `~/.Rprofile`, and there is no `.Rprofile` in the sandbox root?
+- [ ] No `SCRIPT_PATH` / `DATA_PATH` left over in `~/.Renviron`?
+- [ ] `sandbox-sync --version` works in a terminal?
+- [ ] Output log shows "Sandbox detected"?
+- [ ] An R session is running in the Console when pressing Ctrl+Alt+W?
 
-## Next Steps
+## If it still does not work
 
-If you've followed all the steps and it's still not working, please share:
+Collect:
 1. The complete "Sandbox Sync" output log
 2. Your folder structure (screenshot or text)
-3. Contents of your `.Renviron` file
-4. What happens when you press Ctrl+Alt+W (any notification? any log entry?)
+3. The contents of the root `.Renviron`
+4. What happens when you press Ctrl+Alt+W (status bar message, console output)

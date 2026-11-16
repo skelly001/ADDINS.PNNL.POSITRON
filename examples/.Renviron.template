@@ -1,11 +1,12 @@
 # .Renviron configuration for sandbox-sync
-# Place this file in your SCRIPT_PATH (r_script_sandbox root)
+# Place this file in the root of your r_script_sandbox folder.
+# This is the ONLY place the sandbox paths are recorded: the Positron
+# extension reads it directly, and the block in ~/.Rprofile loads it into R.
 
-# REQUIRED: Absolute path to your scripts sandbox (Git-tracked)
-# This should be the root of your r_script_sandbox directory
-SCRIPT_PATH="/path/to/r_script_sandbox"
-
-# REQUIRED: Absolute path to your data sandbox (OneDrive-backed)
-# This should be the root of your data_sandbox directory
+# REQUIRED: absolute path to your data sandbox (on a cloud drive).
+# Use forward slashes, also on Windows. Quote the value if it has spaces.
 DATA_PATH="/path/to/data_sandbox"
 
+# OPTIONAL: absolute path to your scripts sandbox. Leave it out: it defaults
+# to the folder this file is in.
+# SCRIPT_PATH="/path/to/r_script_sandbox"

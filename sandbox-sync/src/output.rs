@@ -33,6 +33,7 @@ pub struct SyncFullOutput {
 }
 
 impl SyncFullOutput {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         scripts_path: PathBuf,
         data_path: PathBuf,
@@ -62,6 +63,19 @@ impl SyncFullOutput {
 
     pub fn to_json(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(self)
+    }
+
+    /// Prints the result: JSON on stdout if requested, otherwise the human
+    /// message (stdout on success, stderr on failure).
+    pub fn print(&self, json: bool) -> serde_json::Result<()> {
+        if json {
+            println!("{}", self.to_json()?);
+        } else if self.ok {
+            println!("{}", self.to_human_string());
+        } else {
+            eprintln!("{}", self.to_human_string());
+        }
+        Ok(())
     }
 
     pub fn to_human_string(&self) -> String {
@@ -133,6 +147,19 @@ impl EnsurePathOutput {
 
     pub fn to_json(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(self)
+    }
+
+    /// Prints the result: JSON on stdout if requested, otherwise the human
+    /// message (stdout on success, stderr on failure).
+    pub fn print(&self, json: bool) -> serde_json::Result<()> {
+        if json {
+            println!("{}", self.to_json()?);
+        } else if self.ok {
+            println!("{}", self.to_human_string());
+        } else {
+            eprintln!("{}", self.to_human_string());
+        }
+        Ok(())
     }
 
     pub fn to_human_string(&self) -> String {
