@@ -21,3 +21,7 @@ sandbox-switcher/node_modules/
 ~$*
 
 
+
+# Local settings and build output
+.env
+sandbox-switcher/out/

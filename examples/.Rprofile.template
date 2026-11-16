@@ -1,113 +1,72 @@
-# .Rprofile for sandbox-sync
-# Place this file in your SCRIPT_PATH (r_script_sandbox root)
+# Sandbox sync startup
 #
-# This file runs on R session startup and performs initial sync between
-# your scripts and data sandboxes.
+# Add this block to the .Rprofile in your HOME directory (run
+# path.expand("~/.Rprofile") in R to see where that is). It contains no paths:
+# the sandbox paths are recorded only in the .Renviron at the root of your
+# r_script_sandbox folder.
+#
+# When an R session starts anywhere inside a folder whose name starts with
+# "r_script_sandbox" (the root or any project subfolder), this block:
+#   1. loads the .Renviron from the sandbox root, so SCRIPT_PATH and DATA_PATH
+#      are set in the session;
+#   2. runs `sandbox-sync sync-full` and prints its one-line result.
+# In any other folder it does nothing.
+#
+# Do not keep a separate .Rprofile in the sandbox root: R runs only one
+# .Rprofile (the startup folder's if there is one, otherwise this one). If a
+# project subfolder needs its own .Rprofile, start it with
+#   source("~/.Rprofile")
 
-# Function to perform sandbox sync on startup
-.sandbox_sync_startup <- function() {
-  # Get the directory where this .Rprofile is located
-  # This should be the SCRIPT_PATH
-  script_dir <- getwd()
-  # message("Working directory when .Rprofile loaded: ", getwd())
-  
-  # Load .Renviron from the same directory
-  renviron_path <- file.path(script_dir, ".Renviron")
+local({
+  parts <- strsplit(
+    normalizePath(getwd(), winslash = "/", mustWork = FALSE),
+    "/",
+    fixed = TRUE
+  )[[1]]
+  hit <- which(startsWith(parts, "r_script_sandbox"))
+  if (length(hit) == 0) {
+    return(invisible(NULL))
+  }
+  root <- paste(parts[seq_len(hit[1])], collapse = "/")
 
-  if (!file.exists(renviron_path)) {
-    message("Warning: .Renviron not found in ", script_dir)
-    message("Sandbox sync skipped. Please create .Renviron with SCRIPT_PATH and DATA_PATH")
+  renviron <- file.path(root, ".Renviron")
+  if (!file.exists(renviron)) {
+    message("sandbox-sync: no .Renviron in ", root, "; sync skipped")
+    return(invisible(NULL))
+  }
+  # The root .Renviron is the only record of the paths: drop any values that
+  # came from elsewhere (such as an old copy in ~/.Renviron) before loading it.
+  Sys.unsetenv(c("SCRIPT_PATH", "DATA_PATH"))
+  readRenviron(renviron)
+
+  # SCRIPT_PATH is optional in .Renviron: it is the sandbox root itself.
+  if (!nzchar(Sys.getenv("SCRIPT_PATH"))) {
+    Sys.setenv(SCRIPT_PATH = root)
+  }
+  if (!nzchar(Sys.getenv("DATA_PATH"))) {
+    message("sandbox-sync: DATA_PATH is not defined in ", renviron, "; sync skipped")
     return(invisible(NULL))
   }
 
-  # Load the .Renviron file
-  readRenviron(renviron_path)
-
-  # Read SCRIPT_PATH and DATA_PATH from environment
-  scripts_path <- Sys.getenv("SCRIPT_PATH")
-  data_path <- Sys.getenv("DATA_PATH")
-
-  if (scripts_path == "" || data_path == "") {
-    message("Warning: SCRIPT_PATH or DATA_PATH not defined in .Renviron")
-    message("Sandbox sync skipped.")
+  binary <- Sys.which("sandbox-sync")
+  if (!nzchar(binary)) {
+    message("sandbox-sync: binary not found on PATH; sync skipped")
     return(invisible(NULL))
   }
 
-  # Check if SCRIPT_PATH contains "r_script_sandbox" as a whole word
-  # Only run sync if WD is actually in r_script_sandbox
-  if (!grepl("\\br_script_sandbox\\b", script_dir)) {
-    message("Warning: SCRIPT_PATH does not contain 'r_script_sandbox' as whole word")
-    message("Sandbox sync skipped for safety.")
-    return(invisible(NULL))
-  }
-
-  # Find sandbox-sync binary
-  # Try bundled binary first, then PATH
-  binary_path <- Sys.which("sandbox-sync")
-
-  if (binary_path == "") {
-    message("Warning: sandbox-sync binary not found in PATH")
-    message("Sandbox sync skipped. Please install sandbox-sync or add it to PATH.")
-    return(invisible(NULL))
-  }
-
-  # Build command
-  cmd <- sprintf(
-    '%s sync-full --scripts "%s" --data "%s" --json',
-    binary_path,
-    scripts_path,
-    data_path
+  output <- tryCatch(
+    suppressWarnings(system2(
+      binary,
+      c(
+        "sync-full",
+        "--scripts", shQuote(Sys.getenv("SCRIPT_PATH")),
+        "--data", shQuote(Sys.getenv("DATA_PATH"))
+      ),
+      stdout = TRUE,
+      stderr = TRUE
+    )),
+    error = function(e) conditionMessage(e)
   )
-
-  # Run sync-full
-  message("Running sandbox sync...")
-  start_time <- Sys.time()
-
-  result <- tryCatch({
-    output <- system(cmd, intern = TRUE)
-    output_str <- paste(output, collapse = "\n")
-
-    # Try to parse JSON if jsonlite is available
-    if (requireNamespace("jsonlite", quietly = TRUE)) {
-      json <- jsonlite::fromJSON(output_str)
-
-      if (json$ok) {
-        duration <- round(as.numeric(Sys.time() - start_time, units = "secs") * 1000)
-        message(sprintf(
-          "Synced %d directories (%d created, %d existing) in %dms",
-          json$created_total + json$existing_total,
-          json$created_total,
-          json$existing_total,
-          json$duration_ms
-        ))
-
-        if (length(json$warnings) > 0) {
-          for (warn in json$warnings) {
-            message("  Warning: ", warn)
-          }
-        }
-      } else {
-        message("Sync failed:")
-        for (err in json$errors) {
-          message("  Error: ", err)
-        }
-      }
-    } else {
-      # jsonlite not available, just show raw output
-      message(output_str)
-    }
-
-    TRUE
-  }, error = function(e) {
-    message("Sync error: ", e$message)
-    FALSE
-  })
-
-  invisible(result)
-}
-
-# Run sync on startup
-.sandbox_sync_startup()
-
-# Clean up
-rm(.sandbox_sync_startup)
+  message("sandbox-sync: ", paste(output, collapse = "\n"))
+  invisible(NULL)
+})

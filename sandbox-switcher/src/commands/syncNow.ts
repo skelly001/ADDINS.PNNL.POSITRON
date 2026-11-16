@@ -1,50 +1,30 @@
 import { SandboxConfig } from '../config/sandbox';
 import { runSyncFull } from '../utils/cli';
-import { SandboxUI } from '../utils/ui';
+import { errorMessage } from '../utils/ui';
+import { CommandContext } from './context';
 
-/**
- * Implements the syncNow command per CLAUDE.md spec.
- *
- * Runs sync-full with JSON output and displays results.
- */
-export async function syncNow(
-    config: SandboxConfig,
-    binaryPath: string,
-    ui: SandboxUI
-): Promise<void> {
+/** Runs a full two-way directory sync and reports the result. */
+export async function syncNow(config: SandboxConfig, ctx: CommandContext): Promise<void> {
+    const { ui } = ctx;
     ui.log('Running sync-full...');
-    ui.showInfo('Syncing directories...');
 
     try {
-        const result = await runSyncFull(
-            binaryPath,
-            config.scriptsPath,
-            config.dataPath
-        );
+        const result = await runSyncFull(ctx.binaryPath, config);
+        result.warnings.forEach((warning) => ui.log(`  Warning: ${warning}`));
 
         if (result.ok) {
-            const message = `Synced ${result.created_total + result.existing_total} directories (${result.created_total} created, ${result.existing_total} existing) in ${result.duration_ms}ms`;
-            ui.showSuccess(message);
-            ui.log(message);
-
-            // Log details to output channel
-            ui.log(`  Created in scripts: ${result.created_in_scripts}`);
-            ui.log(`  Created in data: ${result.created_in_data}`);
-            ui.log(`  Existing total: ${result.existing_total}`);
-
-            if (result.warnings.length > 0) {
-                ui.log(`  Warnings: ${result.warnings.join(', ')}`);
-            }
+            ui.status(
+                'success',
+                `Sync: ${result.created_in_scripts} created in Scripts, ` +
+                    `${result.created_in_data} created in Data (${result.duration_ms}ms)`
+            );
         } else {
-            const errorMsg = `Sync failed: ${result.errors.join(', ')}`;
-            ui.showErrorNotification(errorMsg);
-            ui.log(errorMsg);
+            result.errors.forEach((error) => ui.log(`  Error: ${error}`));
+            ui.notifyError(`Sandbox sync failed: ${result.errors[0] ?? 'unknown error'}`);
             ui.showOutput();
         }
     } catch (e) {
-        const errorMsg = `Sync error: ${e instanceof Error ? e.message : String(e)}`;
-        ui.showErrorNotification(errorMsg);
-        ui.log(errorMsg);
+        ui.notifyError(`Sandbox sync failed: ${errorMessage(e)}`);
         ui.showOutput();
     }
 }

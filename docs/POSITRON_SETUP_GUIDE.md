@@ -25,12 +25,11 @@ Complete reference for installing, configuring, and using Sandbox Sync in Positr
 - **Operating System**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 20.04+)
 - Two directories:
   - Script sandbox: Path must contain `r_script_sandbox` segment
-  - Data sandbox: Any location (typically OneDrive or network drive)
+  - Data sandbox: Any location (typically a cloud drive or network drive)
 
 ### Optional
 
 - **Git** (if scripts are version controlled)
-- **jsonlite** R package (for prettier sync output)
 
 ## Architecture Overview
 
@@ -51,17 +50,18 @@ A fast, cross-platform CLI tool that:
 ### 2. VS Code Extension (`sandbox-switcher`)
 
 A Positron/VS Code extension that:
-- Detects sandbox configuration automatically
-- Adds dual workspace roots (Scripts and Data)
-- Provides keyboard shortcuts for instant directory switching
-- Sends `setwd()` commands to the R console
-- Invokes micro-syncs when needed
+- Detects the sandbox from the folder you have open
+- Provides one keyboard shortcut for switching the R working directory
+- Sends a single `setwd()` command to the R console
+- Creates the paired folders when they are first used (micro-sync)
+- Can add the paired Scripts and Data folders as workspace roots, on request
 
 ### 3. R Integration
 
-R startup files that:
-- `.Renviron`: Defines `SCRIPT_PATH` and `DATA_PATH`
-- `.Rprofile`: Runs full sync on R session start
+- `.Renviron` in the sandbox root: the single record of the sandbox paths
+  (defines `DATA_PATH`)
+- A path-free block in `~/.Rprofile`: loads that `.Renviron` and runs a full
+  sync whenever R starts inside the sandbox
 
 ## Installation
 
@@ -71,7 +71,7 @@ R startup files that:
 
 1. Download or locate the `.vsix` file:
    ```
-   sandbox-switcher/sandbox-switcher-0.1.0.vsix
+   sandbox-switcher/sandbox-switcher-0.2.0.vsix
    ```
 
 2. Install via Command Palette:
@@ -85,7 +85,7 @@ R startup files that:
 #### Method 2: Command Line
 
 ```bash
-code --install-extension /path/to/sandbox-switcher-0.1.0.vsix
+code --install-extension /path/to/sandbox-switcher-0.2.0.vsix
 ```
 
 #### Method 3: Build from Source
@@ -95,7 +95,7 @@ cd sandbox-switcher
 npm install
 npm run compile
 npm run package  # Creates .vsix file
-code --install-extension sandbox-switcher-0.1.0.vsix
+code --install-extension sandbox-switcher-0.2.0.vsix
 ```
 
 ### Binary Installation
@@ -108,7 +108,7 @@ The extension bundles platform-specific binaries, but they need to be made acces
 
 ```powershell
 # Run PowerShell as Administrator
-$ExtPath = "$env:USERPROFILE\.positron\extensions\pnnl.sandbox-switcher-0.1.0"
+$ExtPath = "$env:USERPROFILE\.positron\extensions\pnnl.sandbox-switcher-0.2.0"
 Copy-Item "$ExtPath\bin\win32-x64\sandbox-sync.exe" -Destination "C:\Windows\System32\"
 ```
 
@@ -119,7 +119,7 @@ Copy-Item "$ExtPath\bin\win32-x64\sandbox-sync.exe" -Destination "C:\Windows\Sys
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin"
 
 # Copy binary
-$ExtPath = "$env:USERPROFILE\.positron\extensions\pnnl.sandbox-switcher-0.1.0"
+$ExtPath = "$env:USERPROFILE\.positron\extensions\pnnl.sandbox-switcher-0.2.0"
 Copy-Item "$ExtPath\bin\win32-x64\sandbox-sync.exe" -Destination "$env:USERPROFILE\bin\"
 
 # Add to PATH (one-time, add to PowerShell profile for persistence)
@@ -140,7 +140,7 @@ $env:PATH += ";$env:USERPROFILE\bin"
 
 ```powershell
 sandbox-sync --version
-# Should output: sandbox-sync 0.1.0
+# Should output: sandbox-sync 0.2.0
 ```
 
 #### Linux
@@ -148,7 +148,7 @@ sandbox-sync --version
 ```bash
 # Copy to user local bin
 mkdir -p ~/.local/bin
-cp ~/.vscode/extensions/pnnl.sandbox-switcher-0.1.0/bin/linux-x64/sandbox-sync ~/.local/bin/
+cp ~/.vscode/extensions/pnnl.sandbox-switcher-0.2.0/bin/linux-x64/sandbox-sync ~/.local/bin/
 
 # Make executable
 chmod +x ~/.local/bin/sandbox-sync
@@ -168,7 +168,7 @@ sandbox-sync --version
 
 ```bash
 # Copy to local bin (requires sudo)
-sudo cp ~/.vscode/extensions/pnnl.sandbox-switcher-0.1.0/bin/darwin-x64/sandbox-sync /usr/local/bin/
+sudo cp ~/.vscode/extensions/pnnl.sandbox-switcher-0.2.0/bin/darwin-arm64/sandbox-sync /usr/local/bin/
 
 # Make executable
 sudo chmod +x /usr/local/bin/sandbox-sync
@@ -200,9 +200,11 @@ cargo build --release
 
 #### Step 1: Create .Renviron
 
-Create `.Renviron` in your **script sandbox root** directory.
+Create `.Renviron` in the root of your scripts sandbox. This is the **only**
+place the sandbox paths are recorded: the extension reads it directly, and the
+block in `~/.Rprofile` (Step 2) loads it into R.
 
-**Location:** The directory that contains `r_script_sandbox` in its path and serves as the root of your scripts.
+**Location:** the folder whose name starts with `r_script_sandbox`.
 
 **Example paths:**
 - Windows: `C:\Users\jdoe\projects\r_script_sandbox\.Renviron`
@@ -213,132 +215,56 @@ Create `.Renviron` in your **script sandbox root** directory.
 ```bash
 # .Renviron - Sandbox Sync Configuration
 
-# REQUIRED: Absolute path to scripts sandbox (Git-tracked)
-SCRIPT_PATH="C:/path/to/r_script_sandbox"
-
-# REQUIRED: Absolute path to data sandbox (OneDrive/cloud)
+# REQUIRED: Absolute path to data sandbox (cloud drive)
 DATA_PATH="C:/path/to/data_sandbox"
 ```
 
 **Rules:**
-1. Use **absolute paths** (full paths from root)
+1. Use an **absolute path** (full path from root)
 2. Use **forward slashes** (`/`) on all platforms, including Windows
-3. Use **double quotes** around paths
-4. No trailing slashes
-5. Script path must contain `r_script_sandbox` as a path segment
-6. Paths may contain spaces if properly quoted
+3. Use **double quotes** around the path; it may then contain spaces
+4. `SCRIPT_PATH` is optional and best left out: it defaults to the folder the
+   `.Renviron` is in. If you do set it and it differs from that folder, the
+   `.Renviron` value is used and a warning is logged.
 
 **Example (Windows):**
 
 ```bash
-SCRIPT_PATH="C:/Users/Jane Doe/Documents/projects/r_script_sandbox"
-DATA_PATH="C:/Users/Jane Doe/OneDrive - PNNL/data_sandbox"
+DATA_PATH="C:/Users/Jane Doe/Cloud Drive/data_sandbox"
 ```
 
 **Example (macOS/Linux):**
 
 ```bash
-SCRIPT_PATH="/home/jdoe/projects/r_script_sandbox"
-DATA_PATH="/mnt/onedrive/data_sandbox"
+DATA_PATH="/mnt/cloud_drive/data_sandbox"
 ```
 
-#### Step 2: Create .Rprofile
+#### Step 2: Add the startup block to `~/.Rprofile`
 
-Copy the template to your script sandbox root:
-
-```bash
-cp examples/.Rprofile.template /path/to/r_script_sandbox/.Rprofile
-```
-
-**Or create manually** with this content:
-
-```r
-# .Rprofile for sandbox-sync
-# Runs on R session startup
-
-.sandbox_sync_startup <- function() {
-  script_dir <- getwd()
-
-  # Load .Renviron from script directory
-  renviron_path <- file.path(script_dir, ".Renviron")
-  if (!file.exists(renviron_path)) {
-    message("Warning: .Renviron not found in ", script_dir)
-    return(invisible(NULL))
-  }
-
-  readRenviron(renviron_path)
-
-  scripts_path <- Sys.getenv("SCRIPT_PATH")
-  data_path <- Sys.getenv("DATA_PATH")
-
-  if (scripts_path == "" || data_path == "") {
-    message("Warning: SCRIPT_PATH or DATA_PATH not defined")
-    return(invisible(NULL))
-  }
-
-  # Safety check: only run in r_script_sandbox
-  if (!grepl("\\br_script_sandbox\\b", script_dir)) {
-    message("Warning: Not in r_script_sandbox")
-    return(invisible(NULL))
-  }
-
-  # Find binary
-  binary_path <- Sys.which("sandbox-sync")
-  if (binary_path == "") {
-    message("Warning: sandbox-sync binary not found")
-    return(invisible(NULL))
-  }
-
-  # Run sync
-  message("Running sandbox sync...")
-  cmd <- sprintf(
-    '%s sync-full --scripts "%s" --data "%s" --json',
-    binary_path, scripts_path, data_path
-  )
-
-  tryCatch({
-    output <- system(cmd, intern = TRUE)
-
-    if (requireNamespace("jsonlite", quietly = TRUE)) {
-      json <- jsonlite::fromJSON(paste(output, collapse = "\n"))
-      if (json$ok) {
-        message(sprintf(
-          "Synced %d directories (%d created, %d existing) in %dms",
-          json$created_total + json$existing_total,
-          json$created_total, json$existing_total, json$duration_ms
-        ))
-      } else {
-        message("Sync failed: ", paste(json$errors, collapse = ", "))
-      }
-    } else {
-      message(paste(output, collapse = "\n"))
-    }
-  }, error = function(e) {
-    message("Sync error: ", e$message)
-  })
-
-  invisible(NULL)
-}
-
-.sandbox_sync_startup()
-rm(.sandbox_sync_startup)
-```
+Copy the block in `examples/.Rprofile.template` into the `.Rprofile` in your
+**home directory**. In R, `path.expand("~/.Rprofile")` shows where that is (on
+Windows it is usually in `Documents`). Create the file if it does not exist.
 
 **Key behaviors:**
-- Runs automatically when R session starts
-- Loads `.Renviron` from script directory
-- Validates configuration before running
-- Calls `sandbox-sync sync-full` with JSON output
-- Prints concise sync summary to console
-- Handles errors gracefully
+- Contains no paths
+- Does nothing unless R starts inside a folder whose name starts with
+  `r_script_sandbox` (the sandbox root or any project subfolder)
+- Loads the root `.Renviron`, so `Sys.getenv("DATA_PATH")` and
+  `Sys.getenv("SCRIPT_PATH")` work in the session. Values for these two that
+  came from anywhere else are replaced.
+- Runs `sandbox-sync sync-full` and prints its one-line result
+- If `DATA_PATH` is unavailable or the binary is missing, prints a message and
+  continues
 
-#### Step 3: Install jsonlite (Optional but Recommended)
+**R runs only one `.Rprofile` per session:** the one in the startup folder if
+there is one, otherwise the one in your home directory. So:
+- Do not keep a `.Rprofile` in the sandbox root
+- If a project subfolder needs its own `.Rprofile`, make its first line
+  `source("~/.Rprofile")`
 
-For prettier console output:
-
-```r
-install.packages("jsonlite")
-```
+**Upgrading from an earlier setup:** delete the old `.Rprofile` from the
+sandbox root, and remove `SCRIPT_PATH` and `DATA_PATH` from `~/.Renviron` if
+you had copied them there.
 
 ## Configuration Reference
 
@@ -346,8 +272,8 @@ install.packages("jsonlite")
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `SCRIPT_PATH` | Yes | Absolute path to scripts sandbox root | `"C:/projects/r_script_sandbox"` |
-| `DATA_PATH` | Yes | Absolute path to data sandbox root | `"C:/OneDrive/data_sandbox"` |
+| `DATA_PATH` | Yes | Absolute path to data sandbox root | `"C:/CloudDrive/data_sandbox"` |
+| `SCRIPT_PATH` | No | Absolute path to scripts sandbox root. Defaults to the folder containing `.Renviron` | `"C:/projects/r_script_sandbox"` |
 
 ### Extension Settings
 
@@ -379,35 +305,51 @@ sandbox-sync ensure-path --scripts <PATH> --data <PATH> --relative <REL> [--json
 Options:
 - `--scripts`: Path to scripts sandbox
 - `--data`: Path to data sandbox
-- `--relative`: Relative path to ensure on both sides
+- `--relative`: Relative path to ensure on both sides (empty means the roots)
 - `--json`: Output JSON
+
+`--scripts-path` and `--data-path` are accepted as longer names for `--scripts`
+and `--data`.
+
+**Exit codes:** 0 success, 2 invalid arguments, 3 DATA_PATH unavailable,
+4 filesystem error (including a file that has the same name as a folder to be
+mirrored), 5 unexpected error.
 
 ## Extension Behavior
 
 ### Activation
 
-The extension activates when:
-1. VS Code/Positron starts
-2. Any workspace folder path contains `r_script_sandbox` as a case-sensitive path segment
+The extension loads when VS Code/Positron starts and looks at the open
+workspace folders. It never changes the workspace or touches the R session on
+its own.
+
+- **Not inside a sandbox:** it stays silent (no popup). Running a sandbox
+  command shows "Not inside an r_script_sandbox folder" in the status bar.
+- **Inside a sandbox with a missing or invalid `.Renviron`:** it shows a
+  warning popup saying what is wrong.
 
 ### Sandbox Detection
 
-**Detection logic:**
-1. Scan all workspace folders for `r_script_sandbox` in path
-2. Truncate path at `r_script_sandbox` (inclusive) to get scripts base
-3. Load `.Renviron` from scripts base
-4. Read `SCRIPT_PATH` and `DATA_PATH`
-5. Validate `SCRIPT_PATH` matches derived scripts base
-6. Check if `DATA_PATH` exists and is accessible
+**Detection logic** (repeated every time a command runs, so edits to
+`.Renviron` and a `DATA_PATH` that comes back are picked up without reloading):
+1. Find the first workspace folder whose path contains a folder name starting
+   with `r_script_sandbox` (case-sensitive)
+2. Truncate the path at that folder (inclusive) to get the scripts root
+3. Load `.Renviron` from the scripts root and read `DATA_PATH` (and
+   `SCRIPT_PATH` if present)
+4. Check whether `DATA_PATH` exists whenever a command needs the Data side
 
 ### Workspace Roots
 
-When activated successfully, the extension adds two workspace roots:
+**Sandbox: Setup Paired Workspace Folders** adds the paired folders for the
+project you have open as two workspace roots:
 
-- **Scripts: r_script_sandbox** → Points to `SCRIPT_PATH`
-- **Data: data_sandbox** → Points to `DATA_PATH` (if accessible)
+- **Scripts: <folder>** → the folder under the scripts sandbox
+- **Data: <folder>** → the paired folder under the data sandbox (if available)
 
-These appear in the Explorer as separate root folders, allowing you to navigate both sandboxes simultaneously.
+This is a manual command because changing workspace folders while the R
+runtime is starting cancels its startup in Positron. If `DATA_PATH` was
+unavailable, run the command again once it is back.
 
 ### Commands
 
@@ -416,73 +358,72 @@ All commands are accessible via Command Palette (`Ctrl+Shift+P`):
 | Command | Default Keybinding | Description |
 |---------|-------------------|-------------|
 | `Sandbox: Switch Working Directory to Opposite Sandbox` | `Ctrl+Alt+W` | Switch R working directory to paired folder |
-| `Sandbox: Reveal Paired Folder` | — | Reveal paired folder in Explorer |
+| `Sandbox: Reveal Paired Folder` | — | Reveal paired folder in Explorer (also in the Explorer right-click menu) |
 | `Sandbox: Sync Directories Now` | — | Manually trigger full sync |
-| `Sandbox: Add Data Workspace Root` | — | Re-add Data root if removed |
-| `Sandbox: Setup Paired Workspace Folders` | — | Re-run workspace setup |
+| `Sandbox: Setup Paired Workspace Folders` | — | Add the paired Scripts and Data folders to the workspace |
 
 ### Directory Switching Behavior
 
 When you invoke **Switch WD to Opposite**:
 
-1. **Context detection** (in order of priority):
-   - Active editor file path
-   - Selected item in Explorer
-   - Last-used sandbox path
+1. **Choose the project folder** (relative to the sandbox roots):
+   - The folder of the active editor's file, if it is a saved file inside a
+     project folder of either sandbox
+   - Otherwise the first open workspace folder that is a project folder
+   - The sandbox roots themselves never qualify. If no project folder is
+     found, the status bar shows "Open a file in a project folder to switch"
+     and nothing else happens.
 
-2. **Path validation**:
-   - Ensure context is within `SCRIPT_PATH` or `DATA_PATH`
-   - If outside both, show notice and abort
+2. **Choose the side:**
+   - The opposite of the side last set for that same project folder in this
+     session
+   - Data, if the folder has not been switched yet
+   - The remembered side is never used to choose the folder, so a different
+     project never inherits the previous project's folder.
 
-3. **Compute relative path**:
-   - If in Scripts: `rel = context relative to SCRIPT_PATH`
-   - If in Data: `rel = context relative to DATA_PATH`
+3. **Micro-sync** (ensure-path):
+   - If either paired folder is missing, run `sandbox-sync ensure-path` and
+     wait for it to finish
 
-4. **Micro-sync** (ensure-path):
-   - Run `sandbox-sync ensure-path --relative <rel>`
-   - Create missing parent directories on both sides
-   - Cache ensured paths to avoid repeated syncs
+4. **Set working directory:**
+   - Send `setwd("<target>")` to the R console
+   - Show the destination in the status bar, e.g.
+     `R working directory → Data: models`
 
-5. **Set working directory**:
-   - Send `setwd("<opposite_path>")` to active R console
-   - If multiple R terminals, prompt user to select one
-
-6. **Reveal in Explorer**:
-   - Expand and highlight the paired folder in Explorer
+5. **Reveal in Explorer:**
+   - Highlight the target folder if it is in the workspace
 
 ### Micro-Sync Policy
 
-To minimize overhead, the extension uses **lazy micro-sync**:
-
-- **Full sync** runs only on R startup (via `.Rprofile`)
-- **Micro-sync** (ensure-path) runs only when:
-  - User switches to a folder for the first time in the session
-  - User invokes "Reveal Paired Folder"
-  - User manually triggers sync
-
-**Caching:** Ensured paths are cached per session to avoid redundant calls.
-
-**Debouncing:** Multiple rapid requests to the same path are debounced.
+- **Full sync** runs on R startup (via the `~/.Rprofile` block) whenever R
+  starts inside the sandbox, or on demand via **Sandbox: Sync Directories Now**.
+  It only creates directories that are missing on one side; a tree that is
+  already in sync is not touched.
+- **Micro-sync** (ensure-path) runs only when a paired folder that is about to
+  be used does not exist yet: on a working directory switch, a paired reveal,
+  or workspace folder setup.
 
 ### DATA_PATH Unavailability Handling
 
-If `DATA_PATH` is unavailable (offline OneDrive, unmounted network drive):
+Availability is checked each time a command runs. If `DATA_PATH` is
+unavailable (offline cloud drive, unmounted network drive):
 
-1. **On activation**:
-   - Show warning notification
-   - Add only Scripts root to workspace
-   - Offer "Retry" action
-
-2. **On directory switch/reveal**:
-   - Show non-blocking warning
+1. **On directory switch to Data, or reveal:**
+   - Show a non-blocking warning
    - Skip ensure-path and Data-side operations
-   - Keep R session untouched
-   - Scripts-side operations continue to work
+   - Keep the R session untouched
 
-3. **On manual sync**:
-   - CLI returns error code 3
-   - Extension shows error message
-   - R startup prints warning but doesn't crash
+2. **On workspace folder setup:**
+   - Add only the Scripts folder
+
+3. **On manual sync:**
+   - CLI returns exit code 3
+   - Extension shows an error message
+
+4. **On R startup:**
+   - The `~/.Rprofile` block prints the CLI message and continues
+
+As soon as `DATA_PATH` is back, the commands work again. No reload is needed.
 
 ## Advanced Usage
 
@@ -504,14 +445,6 @@ Each subfolder is paired with the corresponding path in `data_sandbox`.
 
 **Example:** If you're in `r_script_sandbox/project_a/models/`, switching will set WD to `data_sandbox/project_a/models/`.
 
-### Multiple R Terminals
-
-If you have multiple R consoles running:
-
-1. Extension detects all active R terminals
-2. Prompts you to select which terminal to send `setwd()` to
-3. Remembers your choice for the session
-
 ### Git Integration
 
 The tool is designed to work alongside Git:
@@ -519,7 +452,7 @@ The tool is designed to work alongside Git:
 - Scripts sandbox: Typically a Git repository
 - Data sandbox: Typically ignored by Git (`.gitignore` or separate location)
 - Extension doesn't interfere with Git operations
-- `.Renviron` and `.Rprofile` can be committed to share config
+- `.Renviron` holds a per-user path (`DATA_PATH`), so it is usually not committed
 
 **Recommended `.gitignore` for scripts sandbox:**
 
@@ -535,15 +468,15 @@ The tool is designed to work alongside Git:
 # Or commit .Renviron.example as template
 ```
 
-### OneDrive Optimization
+### Cloud Drive Optimization
 
-The tool is **OneDrive-friendly** by design:
+The tool is **Cloud-drive-friendly** by design:
 
 - **Directory-only operations**: Never reads/writes files, so no placeholder hydration
 - **Minimal API calls**: Only creates directories; doesn't enumerate file contents
-- **No watchers**: Doesn't monitor file changes that could trigger OneDrive sync
+- **No watchers**: Doesn't monitor file changes that could trigger a cloud drive sync
 
-**Result:** Works efficiently even with large OneDrive directories containing TBs of data.
+**Result:** Works efficiently even with large cloud drive directories containing TBs of data.
 
 ### Custom Keyboard Shortcuts
 
@@ -578,73 +511,66 @@ sandbox-sync ensure-path \
 ### Extension Not Activating
 
 **Symptoms:**
-- No workspace roots appear
-- Commands not available in Command Palette
+- Commands show "Not inside an r_script_sandbox folder"
+- A popup says `.Renviron` is missing or invalid
 
 **Causes & Fixes:**
 
-1. **Workspace doesn't contain `r_script_sandbox`:**
-   - Extension only activates in workspaces with this exact folder name (case-sensitive)
-   - Rename your folder to include `r_script_sandbox`
+1. **Workspace is not inside a sandbox:**
+   - A folder in the path must have a name starting with `r_script_sandbox`
+     (case-sensitive), e.g. `r_script_sandbox` or `r_script_sandbox2`
+   - The extension is silent in other folders by design
 
-2. **`.Renviron` missing or malformed:**
-   - Check that `.Renviron` exists in scripts sandbox root
-   - Validate syntax: `KEY="value"` format
-   - Check Output panel: `View > Output > Sandbox Sync`
+2. **`.Renviron` missing or invalid:**
+   - Create `.Renviron` in the sandbox root with an absolute `DATA_PATH`
+   - The fix is picked up the next time you run a command
 
-3. **`DATA_PATH` unavailable:**
-   - Extension still activates but only adds Scripts root
-   - Check if OneDrive is online or network drive is mounted
+3. **Check the log:**
+   - `View > Output` → "Sandbox Sync"
 
 ### Binary Not Found
 
 **Symptoms:**
-- "sandbox-sync binary not found in PATH"
-- Sync doesn't run on R startup
+- "sandbox-sync binary not found" from the extension
+- `sandbox-sync: binary not found on PATH; sync skipped` in the R console
 
-**Fixes:**
+**Causes & Fixes:**
 
-1. **Verify binary location:**
+1. **Extension:** it uses the binary bundled for your platform
+   (`bin/win32-x64`, `bin/linux-x64`, `bin/darwin-arm64`), otherwise
+   `sandbox-sync` on your PATH. On other platforms, build from source and put
+   the binary on your PATH.
+
+2. **R startup:** R always needs `sandbox-sync` on your PATH. Verify with:
    ```bash
-   # Windows
-   where.exe sandbox-sync
-
-   # macOS/Linux
-   which sandbox-sync
-   ```
-
-2. **Add to PATH:**
-   - Windows: Copy to System32 or add binary directory to PATH
-   - macOS/Linux: Copy to `/usr/local/bin` or `~/.local/bin`
-
-3. **Check permissions:**
-   ```bash
-   # macOS/Linux: ensure executable
-   chmod +x /path/to/sandbox-sync
+   which sandbox-sync      # macOS/Linux
+   where.exe sandbox-sync  # Windows
    ```
 
 ### R Working Directory Not Changing
 
 **Symptoms:**
-- Extension shows success but `getwd()` unchanged in R
+- Status bar shows the destination but `getwd()` is unchanged in R
+- Status bar shows "Open a file in a project folder to switch"
 
 **Causes & Fixes:**
 
-1. **No active R terminal:**
-   - Ensure R console is running
-   - Start R console: `Ctrl+Shift+C`
+1. **No R session running:**
+   - The command sends `setwd()` to the Positron R console; start one first
 
-2. **Multiple R terminals:**
-   - Extension will prompt you to select one
-   - Ensure you select the correct terminal
+2. **R console error:**
+   - Check the R console for an error message
+   - The exact command sent is in the "Sandbox Sync" log (`Sent setwd(...)`)
 
-3. **R console error:**
-   - Check R console for error messages
-   - Path might be invalid or inaccessible
+3. **No project folder to switch within:**
+   - Positron is opened at the sandbox root and the active tab is not a saved
+     file inside a project folder. Open such a file, or open Positron at the
+     project folder.
 
-4. **Positron-specific issue:**
-   - Try restarting R console
-   - Check Positron's R integration is working
+4. **Went to the unexpected side:**
+   - The first press for a folder goes to Data and the next goes back to
+     Scripts. If you ran `setwd()` yourself in between, press the shortcut
+     again.
 
 ### Paths with Spaces Not Working
 
@@ -658,28 +584,19 @@ sandbox-sync ensure-path \
 1. **Use forward slashes:**
    ```bash
    # Correct
-   SCRIPT_PATH="C:/Users/John Doe/r_script_sandbox"
+   DATA_PATH="C:/Users/John Doe/CloudDrive/data_sandbox"
 
    # Wrong
-   SCRIPT_PATH="C:\Users\John Doe\r_script_sandbox"
+   DATA_PATH="C:\Users\John Doe\CloudDrive\data_sandbox"
    ```
 
 2. **Use quotes:**
    ```bash
    # Correct
-   SCRIPT_PATH="C:/path with spaces/r_script_sandbox"
+   DATA_PATH="C:/path with spaces/data_sandbox"
 
    # Wrong
-   SCRIPT_PATH=C:/path with spaces/r_script_sandbox
-   ```
-
-3. **No trailing slashes:**
-   ```bash
-   # Correct
-   SCRIPT_PATH="C:/projects/r_script_sandbox"
-
-   # Wrong
-   SCRIPT_PATH="C:/projects/r_script_sandbox/"
+   DATA_PATH=C:/path with spaces/data_sandbox
    ```
 
 ### Sync Slow or Hangs
@@ -695,8 +612,8 @@ sandbox-sync ensure-path \
    - First sync may take longer; subsequent syncs are faster
    - Consider excluding large temp directories
 
-2. **OneDrive throttling:**
-   - OneDrive may temporarily throttle API calls
+2. **Cloud drive throttling:**
+   - The cloud drive client may temporarily throttle API calls
    - Wait and retry
 
 3. **Network drive latency:**
@@ -713,33 +630,16 @@ sandbox-sync ensure-path \
 
 1. **Read-only filesystem:**
    - Ensure both sandboxes are writable
-   - Check OneDrive isn't in read-only mode
+   - Check the cloud drive isn't in read-only mode
 
 2. **Locked by another process:**
    - Another program might have directory locked
-   - Close OneDrive sync client temporarily
+   - Close the cloud drive sync client temporarily
    - Retry after a few seconds (CLI has retry logic)
 
 3. **Insufficient permissions:**
    - Ensure you have write permissions on both sandboxes
    - On Windows, run Positron as admin (not recommended long-term)
-
-### JSON Parsing Errors in R
-
-**Symptoms:**
-- R startup shows raw JSON instead of formatted message
-- "Could not parse JSON" warnings
-
-**Fixes:**
-
-1. **Install jsonlite:**
-   ```r
-   install.packages("jsonlite")
-   ```
-
-2. **Check CLI output:**
-   - Run CLI manually to verify JSON is valid
-   - CLI might be outputting error message instead of JSON
 
 ### Extension Commands Missing
 
@@ -755,7 +655,7 @@ sandbox-sync ensure-path \
 2. **Reinstall extension:**
    ```bash
    code --uninstall-extension pnnl.sandbox-switcher
-   code --install-extension /path/to/sandbox-switcher-0.1.0.vsix
+   code --install-extension /path/to/sandbox-switcher-0.2.0.vsix
    ```
 
 3. **Check extension is enabled:**
@@ -765,24 +665,23 @@ sandbox-sync ensure-path \
 ### DATA_PATH Offline/Unavailable
 
 **Symptoms:**
-- "DATA_PATH unavailable" warning
-- Data workspace root missing
+- "DATA_PATH is not available" warning
+- Data workspace root missing after setup
 
 **Expected Behavior:**
-- This is by design when OneDrive is offline or network drive unmounted
-- Scripts-side operations continue to work
-- Extension offers "Retry" when DATA_PATH becomes available
+- This is by design when the cloud drive is offline or a network drive is unmounted
+- The R session is left untouched
 
 **Fixes:**
 
 1. **Bring DATA_PATH online:**
    - Connect to network
-   - Sign in to OneDrive
+   - Sign in to the cloud drive
    - Mount network drive
 
-2. **Retry in extension:**
-   - Look for notification with "Retry" button
-   - Or reload window: `Ctrl+Shift+P` → "Developer: Reload Window"
+2. **Use the command again:**
+   - Availability is checked on every command; no reload is needed
+   - Run **Sandbox: Setup Paired Workspace Folders** again to add the Data root
 
 ## Uninstallation
 
@@ -815,18 +714,12 @@ rm ~/.local/bin/sandbox-sync
 
 ### Remove R Configuration
 
-Delete `.Rprofile` and `.Renviron` from script sandbox root:
-
-```bash
-rm /path/to/r_script_sandbox/.Rprofile
-rm /path/to/r_script_sandbox/.Renviron
-```
-
-Or keep them for future use.
+Delete `.Renviron` from the script sandbox root and remove the sandbox block
+from `~/.Rprofile`. Or keep them for future use.
 
 ## Best Practices
 
-1. **Commit configuration templates:** Commit `.Renviron.example` and `.Rprofile` to Git so team members can copy and customize.
+1. **Share configuration templates:** Point team members to `examples/.Renviron.template` and `examples/.Rprofile.template` so they can set up their own paths.
 
 2. **Use relative imports in R:** Within scripts, use relative paths so code works whether WD is in scripts or data sandbox.
 

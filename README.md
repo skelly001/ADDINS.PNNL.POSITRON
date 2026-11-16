@@ -1,6 +1,6 @@
 # Sandbox Sync for Positron
 
-> Fast, cross-platform toolkit for seamless workflows between Git-tracked R scripts and OneDrive-backed data directories in Positron IDE.
+> Fast, cross-platform toolkit for seamless workflows between Git-tracked R scripts and cloud-drive data directories in Positron IDE.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Platform Support](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
@@ -17,7 +17,7 @@
 -   ✅ **Directory-only sync** – Creates missing directories; never touches files
 -   ✅ **Instant switching** – Toggle between Scripts and Data with `Ctrl+Alt+W`
 -   ✅ **R integration** – Automatically updates working directory with `setwd()`
--   ✅ **OneDrive-friendly** – No file access that would hydrate large placeholders
+-   ✅ **Cloud-drive-friendly** – No file access that would hydrate large placeholders
 -   ✅ **Cross-platform** – Windows, macOS, Linux
 -   ✅ **Fast** – Built in Rust for performance
 -   ✅ **Safe** – Never deletes anything; directory creation is idempotent
@@ -28,7 +28,7 @@
 
 -   [Positron IDE](https://github.com/posit-dev/positron) or VS Code
 -   R installed and configured
--   Two directories: one for scripts (Git-tracked) and one for data (OneDrive/cloud)
+-   Two directories: one for scripts (Git-tracked) and one for data (cloud drive)
 
 ### Installation
 
@@ -36,14 +36,14 @@
 
     ``` powershell
     # Install from .vsix file
-    positron --install-extension sandbox-switcher-0.1.0.vsix
+    positron --install-extension sandbox-switcher-0.2.0.vsix
     ```
 
 2.  **Copy the Rust binary to system path** (Windows)
 
     ``` powershell
     # Run as Administrator
-    Copy-Item "C:\Users\<username>\.positron\extensions\pnnl.sandbox-switcher-0.1.0\bin\win32-x64\sandbox-sync.exe" -Destination "C:\Windows\System32\"
+    Copy-Item "C:\Users\<username>\.positron\extensions\pnnl.sandbox-switcher-0.2.0\bin\win32-x64\sandbox-sync.exe" -Destination "C:\Windows\System32\"
     ```
 
 3.  **Copy the Rust binary to system path** (Mac)
@@ -55,14 +55,17 @@
 
 4.  **Configure your R environment**
 
-    Create `.Renviron` in your script sandbox root:
+    Create `.Renviron` in your script sandbox root. This is the only place the
+    sandbox paths are recorded:
 
     ``` bash
-    SCRIPT_PATH="C:/path/to/r_script_sandbox"
     DATA_PATH="C:/path/to/data_sandbox"
     ```
 
-    Add `.Rprofile` to your script sandbox root (see [examples/](examples/) for template)
+    Add the block from [examples/.Rprofile.template](examples/.Rprofile.template)
+    to the `.Rprofile` in your home directory (`~/.Rprofile`). It contains no
+    paths: whenever R starts inside the sandbox (the root or any project
+    subfolder) it loads the root `.Renviron` and runs the startup sync.
 
 5.  **Restart R and start working!**
 
@@ -72,7 +75,7 @@ For detailed instructions, see [docs/QUICK_START.md](docs/QUICK_START.md).
 
 ### The Problem
 
-R developers typically work with: - **Scripts** in Git (version controlled, small files) - **Data** in OneDrive/cloud (large files, not in Git)
+R developers typically work with: - **Scripts** in Git (version controlled, small files) - **Data** on a cloud drive (large files, not in Git)
 
 Traditional workflow = manual navigation + R restarts + sync headaches
 
@@ -96,17 +99,18 @@ r_script_sandbox/          data_sandbox/
 | Command                | Shortcut     | Description                            |
 |----------------------|------------------|--------------------------------|
 | Switch WD to Opposite  | `Ctrl+Alt+W` | Switch working directory to paired dir |
-| Setup Paired Workspace | —            | Show counterpart folder in explorer    |
+| Setup Paired Workspace | —            | Add paired Scripts and Data folders    |
+| Reveal Paired Folder   | —            | Show counterpart folder in explorer    |
 | Sync Directories Now   | —            | Manual full sync                       |
 
 ### CLI Commands
 
 ``` bash
 # Full bidirectional sync (automatically run on R startup)
-sandbox-sync --scripts-path <path> --data-path <path> sync-full --json
+sandbox-sync sync-full --scripts <path> --data <path> --json
 
 # Ensure a single relative path exists on both sides
-sandbox-sync --scripts-path <path> --data-path <path> --relative <path> ensure-path --json
+sandbox-sync ensure-path --scripts <path> --data <path> --relative <path> --json
 ```
 
 See `sandbox-sync --help` for all options.
@@ -124,7 +128,7 @@ ADDINS.PNNL.VSC/
 │   ├── src/
 │   │   └── extension.ts
 │   ├── package.json
-│   └── sandbox-switcher-0.1.0.vsix   
+│   └── sandbox-switcher-0.2.0.vsix   
 ├── examples/             # Configuration templates
 │   ├── .Renviron.example
 │   └── .Rprofile.example
@@ -188,7 +192,7 @@ See [docs/POSITRON_SETUP_GUIDE.md](docs/POSITRON_SETUP_GUIDE.md) for comprehensi
 
 -   **Binary not found** → Ensure `sandbox-sync` is in your system PATH or set full path in extension settings
 -   **Paths with spaces** → Use forward slashes and quotes in `.Renviron`
--   **R not updating** → Ensure an active R terminal is running in Positron
+-   **R not updating** → Ensure an R console session is running in Positron
 
 ## Documentation
 
